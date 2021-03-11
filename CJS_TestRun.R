@@ -9,6 +9,13 @@ library(reshape2)
 #rm(list=ls())
 
 #-----------------------------------------------------------------------------------------------# 
-# Load data
+# Load (OLD) data
 #-----------------------------------------------------------------------------------------------# 
-dat <- read.csv('Data/CJS_adults_EHs_AllCovariates.csv',header=TRUE,stringsAsFactors=FALSE,na.strings=c('',NA))
+dat <- read.csv(file.choose(),header=TRUE,stringsAsFactors=FALSE,na.strings=c('',NA))
+
+#-----------------------------------------------------------------------------------------------# 
+# Organize data
+#-----------------------------------------------------------------------------------------------# 
+#Plot covariates (already standardzied)
+  plotcovs <- unique(dat[,c('Plot','Mean.precip','City')])
+  
