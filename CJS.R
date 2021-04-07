@@ -16,14 +16,14 @@ survs <- read.csv('PlotSurveySchedule.csv',header=TRUE,stringsAsFactors=FALSE)
 #-----------------------------------------------------------------------------------------------# 
 # Formatting survey schedule
 #-----------------------------------------------------------------------------------------------# 
-#This is an excel file that Cristina sent me in late 2020, with a summary of plot survey effort from 1987-future
+#This is an excel file sent to me in late 2020, with a summary of plot survey effort from 1987-future
 #In each column labeled yYYYY, values are the number of person-days spent surveying
 
   surv.l <- melt(survs,id.vars=c('plot','code','area.sqmi'),value.name='persondays')
   surv.l$yr <- as.numeric(substr(surv.l$variable,2,5))
   surv.l <- surv.l[!is.na(surv.l$persondays),c('plot','code','area.sqmi','yr','persondays')]
 
-#Adding entry for Harcuvar Mtns survey in 2020. In DataQuestions.docx file, Chad said there were 62 person days
+#Adding entry for Harcuvar Mtns survey in 2020. In DataQuestions.docx file, it's noted there were 62 person days
   surv.l <- rbind(surv.l,data.frame(plot='Harcuvar Mtns',code='HM',area.sqmi=surv.l$area.sqmi[surv.l$code=='HM'][1],yr=2020,persondays=62))
 
 #Change name of Four Peaks plot to match that in live tortoise database:
@@ -78,10 +78,11 @@ survs <- read.csv('PlotSurveySchedule.csv',header=TRUE,stringsAsFactors=FALSE)
   datyr <- ddply(dat,.(plot,tort,sex.corrected,yr),summarize,MCL=MCL[1])
   nrow(datyr) #3429 captures
   length(unique(datyr$tort)) #1557 individuals
-  #Table with number of tortoises caught at least once in each year
+  #Tables with number of tortoises caught at least once in each year
   table(datyr$plot,datyr$yr)
+  plotyr <- ddply(datyr,.(plot,yr),summarize,ntorts=length(tort))
 
-#Create matrix with capture histories (1=captured, 0=plot surveyed, but tortoise not captured, NA=plot not surveyed)  
+#Create matrix with capture histories (1=captured; 0=plot surveyed but tortoise not captured; NA=plot not surveyed)  
   cr <- dcast(datyr, plot + tort ~ yr, value.var='MCL')
   cr.mat <- cr[,3:ncol(cr)]
   names(cr.mat) <- paste0('y',names(cr.mat))
@@ -98,9 +99,16 @@ survs <- read.csv('PlotSurveySchedule.csv',header=TRUE,stringsAsFactors=FALSE)
     }
   }
   cr <- cbind(cr[,1:2],cr.mat)
-  #Create check: number of tortoises captured each year at each plot
   
-   
+  # #Check: number of tortoises captured each year at each plot (same totals from datyr and cr dataframes?)
+  # crcheck <- melt(cr,id.vars=c('plot','tort'))
+  # names(crcheck)[3] <- 'yr'
+  # crcheck$yr <- as.numeric(substr(crcheck$yr,2,5))
+  # crcheck <- ddply(crcheck,.(plot,yr),summarize,ntorts=sum(value))
+  # crcheck <- crcheck[!is.na(crcheck$ntorts),]
+  # all.equal(crcheck,plotyr)
+  # all.equal(crcheck$ntorts,plotyr$ntorts)
+
   
 
   
