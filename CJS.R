@@ -110,11 +110,7 @@ survs <- read.csv('PlotSurveySchedule.csv',header=TRUE,stringsAsFactors=FALSE)
   # all.equal(crcheck$ntorts,plotyr$ntorts)
 
 #-----------------------------------------------------------------------------------------------# 
-<<<<<<< HEAD
 # Function to create initial values for JAGS
-=======
-# Function to prep objects for JAGS
->>>>>>> 1e5c6337056c67ebec204534c47e5b3e07eda2fb
 #-----------------------------------------------------------------------------------------------# 
 #Create a matrix of initial values for latent states (z)
 #NAs up to and including the first occasion, 1's for the remainder
@@ -126,11 +122,7 @@ survs <- read.csv('PlotSurveySchedule.csv',header=TRUE,stringsAsFactors=FALSE)
   }
 
 #-----------------------------------------------------------------------------------------------# 
-<<<<<<< HEAD
 # Run simple CJS model in JAGS, no covariates, no random effects
-=======
-# Run simple CJS model in JAGS, no random effects
->>>>>>> 1e5c6337056c67ebec204534c47e5b3e07eda2fb
 #-----------------------------------------------------------------------------------------------# 
 #Create vector indicating the first year each tortoise was caught:
   first <- rep(NA,nrow(cr.mat))
@@ -205,6 +197,5 @@ survs <- read.csv('PlotSurveySchedule.csv',header=TRUE,stringsAsFactors=FALSE)
                    n.chains=nc, n.adapt=na, n.iter=ni.tot, n.burnin=nb,
                    parallel=T, n.cores=3, DIC=FALSE)  
   #Took about 17 min on laptop with above MCMC settings.
-	
 	print(fit.cjs0)
   
