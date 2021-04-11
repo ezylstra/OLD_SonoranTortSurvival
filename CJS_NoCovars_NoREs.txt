@@ -1,0 +1,42 @@
+
+    model{
+      
+      #-- Priors and constraints
+      
+      for (i in 1:ntorts){
+        for(t in first[i]:(nyears-1)){
+        
+          logit(phi[i,t]) <- beta.phi0
+          logit(p[i,t]) <- alpha.p0
+
+        } #t
+      }#i   
+      
+      beta.phi0 ~ dlogis(0,1)
+      alpha.p0 ~ dlogis(0,1)
+
+      #-- Likelihood
+      
+      for(i in 1:ntorts){
+        z[i,first[i]] <- 1
+        
+        for (t in (first[i]+1):nyears){              
+        
+          #State process
+          z[i,t] ~ dbern(p_alive[i,t])
+          p_alive[i,t] <- phi[i,t-1]*z[i,t-1]
+          
+          #Observation process
+          y[i,t] ~ dbern(p_obs[i,t])
+          p_obs[i,t] <- p[i,t-1]*z[i,t]               
+          
+        } #t
+      } #i
+
+      #-- Derived parameters
+      
+      logit(phi0) <- beta.phi0
+      logit(p0) <- alpha.p0
+
+    } #model
+  
