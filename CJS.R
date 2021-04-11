@@ -4,6 +4,8 @@
 
 library(plyr)
 library(reshape2)
+library(jagsUI)
+library(runjags)
 
 rm(list=ls())
 
@@ -78,8 +80,7 @@ survs <- read.csv('PlotSurveySchedule.csv',header=TRUE,stringsAsFactors=FALSE)
   datyr <- ddply(dat,.(plot,tort,sex.corrected,yr),summarize,MCL=MCL[1])
   nrow(datyr) #3429 captures
   length(unique(datyr$tort)) #1557 individuals
-  #Tables with number of tortoises caught at least once in each year
-  table(datyr$plot,datyr$yr)
+  #Dataframe with number of tortoises caught at least once in each year a plot was surveyed
   plotyr <- ddply(datyr,.(plot,yr),summarize,ntorts=length(tort))
 
 #Create matrix with capture histories (1=captured; 0=plot surveyed but tortoise not captured; NA=plot not surveyed)  
@@ -106,9 +107,96 @@ survs <- read.csv('PlotSurveySchedule.csv',header=TRUE,stringsAsFactors=FALSE)
   # crcheck$yr <- as.numeric(substr(crcheck$yr,2,5))
   # crcheck <- ddply(crcheck,.(plot,yr),summarize,ntorts=sum(value))
   # crcheck <- crcheck[!is.na(crcheck$ntorts),]
-  # all.equal(crcheck,plotyr)
   # all.equal(crcheck$ntorts,plotyr$ntorts)
 
-  
+#-----------------------------------------------------------------------------------------------# 
+# Function to prep objects for JAGS
+#-----------------------------------------------------------------------------------------------# 
+#Create a matrix of initial values for latent states (z)
+#NAs up to and including the first occasion, 1's for the remainder
+  ch.init <- function(y,f){
+    for (i in 1:length(f)){
+      if(f[i]==ncol(y)) {y[i,] <- NA} else
+        {y[i,1:f[i]] <- NA; y[i,(f[i]+1):ncol(y)] <- 1}}
+    return(y)
+  }
 
+#-----------------------------------------------------------------------------------------------# 
+# Run simple CJS model in JAGS, no random effects
+#-----------------------------------------------------------------------------------------------# 
+#Create vector indicating the first year each tortoise was caught:
+  first <- rep(NA,nrow(cr.mat))
+  for(i in 1:nrow(cr.mat)){
+    first[i] <- (1:ncol(cr.mat))[!is.na(cr.mat[i,]) & cr.mat[i,]>0][1]
+  }
+
+#Prep data objects for JAGS (no covariates, no random effects)
+  tortdata <- list(y=as.matrix(cr.mat),
+                   ntorts=nrow(cr.mat),
+                   nyears=ncol(cr.mat),
+                   first=first)
+
+#JAGS model: no covariates, no random effects	
+  sink("CJS_NoCovars_NoREs.txt")
+  cat("
+    model{
+      
+      #-- Priors and constraints
+      
+      for (i in 1:ntorts){
+        for(t in first[i]:(nyears-1)){
+        
+          logit(phi[i,t]) <- beta.phi0
+          logit(p[i,t]) <- alpha.p0
+
+        } #t
+      }#i   
+      
+      beta.phi0 ~ dlogis(0,1)
+      alpha.p0 ~ dlogis(0,1)
+
+      #-- Likelihood
+      
+      for(i in 1:ntorts){
+        z[i,first[i]] <- 1
+        
+        for (t in (first[i]+1):nyears){              
+        
+          #State process
+          z[i,t] ~ dbern(p_alive[i,t])
+          p_alive[i,t] <- phi[i,t-1]*z[i,t-1]
+          
+          #Observation process
+          y[i,t] ~ dbern(p_obs[i,t])
+          p_obs[i,t] <- p[i,t-1]*z[i,t]               
+          
+        } #t
+      } #i
+
+      #-- Derived parameters
+      
+      logit(phi0) <- beta.phi0
+      logit(p0) <- alpha.p0
+
+    } #model
+  ",fill=TRUE)
+  sink()
+  
+#MCMC settings, parameters, initial values  
+  ni <- 2000; na <- 1000; nb <- 8000; nc <- 3; ni.tot <- ni + nb
+	
+	params <- c('beta.phi0','alpha.p0','phi0','p0')
+  
+  inits <- function() {list(beta.phi0=runif(1,0,3),
+                            alpha.p0=runif(1,-2,2),
+                            z=ch.init(as.matrix(cr.mat),first))}
+
+#Run model
+	fit.cjs0 <- jags(data=tortdata, inits=inits, parameters.to.save=params,
+                   model.file='CJS_NoCovars_NoREs.txt',
+                   n.chains=nc, n.adapt=na, n.iter=ni.tot, n.burnin=nb,
+                   parallel=T, n.cores=3, DIC=FALSE)  
+  #Took about 17 min on laptop with above MCMC settings.
+	
+	print(fit.cjs0)
   
