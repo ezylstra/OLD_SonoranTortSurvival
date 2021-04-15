@@ -14,6 +14,9 @@ rm(list=ls())
 #-----------------------------------------------------------------------------------------------# 
 dat <- read.csv('CapRecapData.csv',header=TRUE,stringsAsFactors=FALSE,na.strings=c('',NA))
 survs <- read.csv('PlotSurveySchedule.csv',header=TRUE,stringsAsFactors=FALSE)
+pdsi <- read.csv('PDSI_July.csv',header=TRUE,stringsAsFactors=FALSE)
+precip.norms <- read.csv('Precip_norms.csv',header=TRUE,stringsAsFactors=FALSE)
+precip.aj <- read.csv('Precip_AJ.csv',header=TRUE,stringsAsFactors=FALSE)
 
 #-----------------------------------------------------------------------------------------------# 
 # Formatting survey schedule
@@ -72,20 +75,20 @@ survs <- read.csv('PlotSurveySchedule.csv',header=TRUE,stringsAsFactors=FALSE)
   sexes <- ddply(dat,.(plot,tort),summarize,n.sex=length(unique(sex)),sex.first=sex[1],sex.last=sex[length(sex)])
   sexes[sexes$n.sex>1,] #25 individuals given different sex assignments
   #With no other information, I'll assume sex at last capture is correct
-  dat$sex.corrected <- sexes$sex.last[match(dat$tort,sexes$tort)]
+  dat$sex <- sexes$sex.last[match(dat$tort,sexes$tort)]
   #3494 fem, 3675 male, 7 unk
-  dat[dat$sex.corrected==3,] #Most unk sex are smaller adults (MCL<=210), and all were only captured once
+  dat[dat$sex==3,] #Most unk sex are smaller adults (MCL<=210), and all were only captured once
 
 #Retain only a single capture each year (using MCL at first capture)
-  datyr <- ddply(dat,.(plot,tort,sex.corrected,yr),summarize,MCL=MCL[1])
+  datyr <- ddply(dat,.(plot,tort,sex,yr),summarize,MCL=MCL[1])
   nrow(datyr) #3429 captures
   length(unique(datyr$tort)) #1557 individuals
   #Dataframe with number of tortoises caught at least once in each year a plot was surveyed
   plotyr <- ddply(datyr,.(plot,yr),summarize,ntorts=length(tort))
 
 #Create matrix with capture histories (1=captured; 0=plot surveyed but tortoise not captured; NA=plot not surveyed)  
-  cr <- dcast(datyr, plot + tort ~ yr, value.var='MCL')
-  cr.mat <- cr[,3:ncol(cr)]
+  cr <- dcast(datyr, plot + tort + sex ~ yr, value.var='MCL')
+  cr.mat <- cr[,4:ncol(cr)]
   names(cr.mat) <- paste0('y',names(cr.mat))
   #Add columns for years when no plots were surveyed (1989, 2009, 2011-2014)
   cr.mat <- cbind(cr.mat,data.frame(y1989=rep(NA,nrow(cr.mat)),y2009=NA,y2011=NA,y2012=NA,y2013=NA,y2014=NA))
@@ -99,11 +102,11 @@ survs <- read.csv('PlotSurveySchedule.csv',header=TRUE,stringsAsFactors=FALSE)
       cr.mat[i,j] <- ifelse(is.na(cr.mat[i,j]),0,1)
     }
   }
-  cr <- cbind(cr[,1:2],cr.mat)
+  cr <- cbind(cr[,1:3],cr.mat)
   
   # #Check: number of tortoises captured each year at each plot (same totals from datyr and cr dataframes?)
-  # crcheck <- melt(cr,id.vars=c('plot','tort'))
-  # names(crcheck)[3] <- 'yr'
+  # crcheck <- melt(cr,id.vars=c('plot','tort','sex'))
+  # names(crcheck)[4] <- 'yr'
   # crcheck$yr <- as.numeric(substr(crcheck$yr,2,5))
   # crcheck <- ddply(crcheck,.(plot,yr),summarize,ntorts=sum(value))
   # crcheck <- crcheck[!is.na(crcheck$ntorts),]
@@ -122,7 +125,7 @@ survs <- read.csv('PlotSurveySchedule.csv',header=TRUE,stringsAsFactors=FALSE)
   }
 
 #-----------------------------------------------------------------------------------------------# 
-# Run simple CJS model in JAGS, no covariates, no random effects
+# Create vector indicating the first year each torotise was captured
 #-----------------------------------------------------------------------------------------------# 
 #Create vector indicating the first year each tortoise was caught:
   first <- rep(NA,nrow(cr.mat))
@@ -130,6 +133,9 @@ survs <- read.csv('PlotSurveySchedule.csv',header=TRUE,stringsAsFactors=FALSE)
     first[i] <- (1:ncol(cr.mat))[!is.na(cr.mat[i,]) & cr.mat[i,]>0][1]
   }
 
+#-----------------------------------------------------------------------------------------------# 
+# Run simple CJS model in JAGS, no covariates, no random effects
+#-----------------------------------------------------------------------------------------------# 
 #Prep data objects for JAGS (no covariates, no random effects)
   tortdata <- list(y=as.matrix(cr.mat),
                    ntorts=nrow(cr.mat),
@@ -199,3 +205,45 @@ survs <- read.csv('PlotSurveySchedule.csv',header=TRUE,stringsAsFactors=FALSE)
   #Took about 17 min on laptop with above MCMC settings.
 	print(fit.cjs0)
   
+#-----------------------------------------------------------------------------------------------# 
+# Run CJS model in JAGS with covariates (fixed effects), no random effects
+#-----------------------------------------------------------------------------------------------# 
+#Formatting individual covariates
+	sex <- cr$sex
+	sex[sex==3] <- NA
+	male <- sex-1
+	
+#Formatting site covariates
+	precip.norms <- precip.norms[order(precip.norms$plot),]
+	# #Check that plots are in the same order they're found in capture histories
+	# all.equal(unique(cr$plot),unique(precip.norms$plot))
+	precipnorm.mn <- mean(precip.norms$ppt.mm)
+	precipnorm.sd <- sd(precip.norms$ppt.mm)
+	precip.norm <- (precip.norms$ppt.mm - precipnorm.mn)/precipnorm.sd
+	
+#Format site*year covariates
+	pdsi <- pdsi[with(pdsi,order(plot,yr)),]
+	# #Check that plots are in the same order they're found in capture histories
+	# all.equal(unique(cr$plot),unique(pdsi$plot))
+	pdsi.mn <- mean(pdsi$pdsi)
+	pdsi.sd <- sd(pdsi$pdsi)
+	pdsi$pdsi.z <- (pdsi$pdsi - pdsi.mn)/pdsi.sd
+	pdsi.mat <- dcast(pdsi,plot~yr,value.var='pdsi.z')
+	
+	names(precip.aj)[names(precip.aj)=='season'] <- 'yr'
+	precip.aj <- precip.aj[precip.aj$yr>1986,]
+	precip.aj <- precip.aj[with(precip.aj,order(plot,yr)),]
+	# #Check that plots are in the same order they're found in capture histories
+	# all.equal(unique(cr$plot),unique(precip.aj$plot))	
+	precipbyplot <- ddply(precip.aj,.(plot),summarize,ppt.mn=mean(ppt),ppt.sd=sd(ppt))
+	precip.aj <- join(precip.aj,precipbyplot,by='plot',type='left')
+	precip.aj$ppt.z <- (precip.aj$ppt - precip.aj$ppt.mn)/precip.aj$ppt.sd
+	# #check:
+	# ddply(precip.aj,.(plot),summarize,mn=mean(ppt.z),sd=sd(ppt.z))
+	ppt.mat <- dcast(precip.aj,plot~yr,value.var='ppt.z')
+	
+#Plot index for each tortoise
+	plots <- data.frame(plot=unique(cr$plot),plot.index=1:length(unique(cr$plot)))
+  plot.index <- plots$plot.index[match(cr$plot,plots$plot)]	
+
+	
