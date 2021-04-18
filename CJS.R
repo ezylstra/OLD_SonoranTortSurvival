@@ -14,9 +14,9 @@ rm(list=ls())
 #-----------------------------------------------------------------------------------------------# 
 dat <- read.csv('CapRecapData.csv',header=TRUE,stringsAsFactors=FALSE,na.strings=c('',NA))
 survs <- read.csv('PlotSurveySchedule.csv',header=TRUE,stringsAsFactors=FALSE)
-pdsi <- read.csv('PDSI_July.csv',header=TRUE,stringsAsFactors=FALSE)
+pdsi <- read.csv('PDSI.csv',header=TRUE,stringsAsFactors=FALSE)
 precip.norms <- read.csv('Precip_norms.csv',header=TRUE,stringsAsFactors=FALSE)
-precip.aj <- read.csv('Precip_AJ.csv',header=TRUE,stringsAsFactors=FALSE)
+precip <- read.csv('Precip_Monthly.csv',header=TRUE,stringsAsFactors=FALSE)
 
 #-----------------------------------------------------------------------------------------------# 
 # Formatting survey schedule
@@ -211,9 +211,9 @@ precip.aj <- read.csv('Precip_AJ.csv',header=TRUE,stringsAsFactors=FALSE)
 #Formatting individual covariates
 	sex <- cr$sex
 	sex[sex==3] <- NA
-	male <- sex-1
+	male.ind <- sex-1
 	
-#Formatting site covariates
+#Formatting site covariate: precipitation normals
 	precip.norms <- precip.norms[order(precip.norms$plot),]
 	# #Check that plots are in the same order they're found in capture histories
 	# all.equal(unique(cr$plot),unique(precip.norms$plot))
@@ -221,29 +221,270 @@ precip.aj <- read.csv('Precip_AJ.csv',header=TRUE,stringsAsFactors=FALSE)
 	precipnorm.sd <- sd(precip.norms$ppt.mm)
 	precip.norm <- (precip.norms$ppt.mm - precipnorm.mn)/precipnorm.sd
 	
-#Format site*year covariates
-	pdsi <- pdsi[with(pdsi,order(plot,yr)),]
+#Formatting site*year covariate: drought
+  #Going to calculate mean PDSI averaged over the previous 12 and 24 months (used 24-mon index in 2013 paper)
+	pdsi <- pdsi[with(pdsi,order(div,yr,mon)),]
+	pdsi$pdsi.12 <- NA
+	pdsi$pdsi.24 <- NA
+	jul.index <- which(pdsi$yr %in% 1988:2020 & pdsi$mon==7)
+	for(i in jul.index){
+	  pdsi$pdsi.12[i] <- mean(pdsi$pdsi[(i-11):i])
+	  pdsi$pdsi.24[i] <- mean(pdsi$pdsi[(i-23):i])
+	}
+	pdsi.mn <- pdsi[!is.na(pdsi$pdsi.12),c('div','yr','pdsi.12','pdsi.24')]
+  #Link plot to the appropriate climate division
+	plotdiv <- data.frame(plot=unique(cr$plot),div=c(1,1,3,1,6,6,6,1,3,6,3,6,5,6,6,3,7),stringsAsFactors=FALSE)
+	plotdiv
+	pdsi.plot <- expand.grid(yr=1988:2020,plot=plotdiv$plot)
+	pdsi.plot$div <- plotdiv$div[match(pdsi.plot$plot,plotdiv$plot)]
+	pdsi.plot <- join(pdsi.plot,pdsi.mn,by=c('div','yr'),type='left')
+	pdsi.12 <- dcast(pdsi.plot,plot~yr,mean,value.var='pdsi.12')
+	pdsi.24 <- dcast(pdsi.plot,plot~yr,mean,value.var='pdsi.24')
 	# #Check that plots are in the same order they're found in capture histories
-	# all.equal(unique(cr$plot),unique(pdsi$plot))
-	pdsi.mn <- mean(pdsi$pdsi)
-	pdsi.sd <- sd(pdsi$pdsi)
-	pdsi$pdsi.z <- (pdsi$pdsi - pdsi.mn)/pdsi.sd
-	pdsi.mat <- dcast(pdsi,plot~yr,value.var='pdsi.z')
-	
-	names(precip.aj)[names(precip.aj)=='season'] <- 'yr'
-	precip.aj <- precip.aj[precip.aj$yr>1986,]
-	precip.aj <- precip.aj[with(precip.aj,order(plot,yr)),]
+	# all.equal(unique(cr$plot),as.character(pdsi.12$plot))	
+	# all.equal(unique(cr$plot),as.character(pdsi.24$plot))	
+	pdsi.12.mat <- as.matrix(pdsi.12[,2:ncol(pdsi.12)])
+	pdsi.24.mat <- as.matrix(pdsi.24[,2:ncol(pdsi.24)])
+	pdsi12.mn <- mean(pdsi.12.mat)
+	pdsi12.sd <- sd(pdsi.12.mat)
+	pdsi24.mn <- mean(pdsi.24.mat)
+	pdsi24.sd <- sd(pdsi.24.mat)	
+	pdsi12.z <- (pdsi.12.mat - pdsi12.mn)/pdsi12.sd
+	pdsi24.z <- (pdsi.24.mat - pdsi24.mn)/pdsi24.sd
+
+#Formatting site*year covariate: precipitation	
+	precip <- precip[with(precip,order(plot,season)),]
 	# #Check that plots are in the same order they're found in capture histories
-	# all.equal(unique(cr$plot),unique(precip.aj$plot))	
+	# all.equal(unique(cr$plot),unique(precip$plot))
+	#Cumulative precipitation (mm) at each plot from Aug-Jul
+	precip.aj <- ddply(precip[precip$season %in% 1988:2020,],.(plot,season),summarize,ppt=sum(ppt))
+	#Standardizing values by plot mean/SDs (can then compare effects of precipitation that's 1-SD above average)
 	precipbyplot <- ddply(precip.aj,.(plot),summarize,ppt.mn=mean(ppt),ppt.sd=sd(ppt))
 	precip.aj <- join(precip.aj,precipbyplot,by='plot',type='left')
 	precip.aj$ppt.z <- (precip.aj$ppt - precip.aj$ppt.mn)/precip.aj$ppt.sd
 	# #check:
 	# ddply(precip.aj,.(plot),summarize,mn=mean(ppt.z),sd=sd(ppt.z))
-	ppt.mat <- dcast(precip.aj,plot~yr,value.var='ppt.z')
+	ppt.df <- dcast(precip.aj,plot~season,value.var='ppt.z')
+	ppt.mat <- as.matrix(ppt.df[,2:ncol(ppt.df)])
 	
 #Plot index for each tortoise
 	plots <- data.frame(plot=unique(cr$plot),plot.index=1:length(unique(cr$plot)))
   plot.index <- plots$plot.index[match(cr$plot,plots$plot)]	
+
+#Prep data objects for JAGS
+  tortdata <- list(y=as.matrix(cr.mat),
+                   ntorts=nrow(cr.mat),
+                   nyears=ncol(cr.mat),
+                   first=first,
+                   male=male.ind,
+                   plot=plot.index,
+                   mean.precip=precip.norm,
+                   drought=pdsi24.z,
+                   precip=ppt.mat)
+
+#JAGS model: no covariates, no random effects	
+  sink("CJS_CovarsNoTrend_NoREs.txt")
+  cat("
+    model{
+      
+      #-- Priors and constraints
+      
+      for (i in 1:ntorts){
+        for(t in first[i]:(nyears-1)){
+        
+          logit(phi[i,t]) <- beta.phi0 + b.male*male[i] + b.mnprecip*mean.precip[plot[i]] + b.drought*drought[plot[i],t] +
+                             b.int*mean.precip[plot[i]]*drought[plot[i],t] 
+          logit(p[i,t]) <- alpha.p0 + a.male*male[i] + a.precip*precip[plot[i],t]
+
+        } #t
+      }#i   
+      
+      beta.phi0 ~ dlogis(0,1)
+      b.male ~ dnorm(0,0.1)
+      b.mnprecip ~ dnorm(0,0.1)
+      b.drought ~ dnorm(0,0.1)
+      b.int ~ dnorm(0,0.1)
+      alpha.p0 ~ dlogis(0,1)
+      a.male ~ dnorm(0,0.1)
+      a.precip ~ dnorm(0,0.1)      
+      psi ~ dunif(0,1)
+  
+      #-- Likelihood
+      
+      for(i in 1:ntorts){
+        z[i,first[i]] <- 1
+        male[i] ~ dbern(psi)
+        
+        for (t in (first[i]+1):nyears){              
+        
+          #State process
+          z[i,t] ~ dbern(p_alive[i,t])
+          p_alive[i,t] <- phi[i,t-1]*z[i,t-1]
+          
+          #Observation process
+          y[i,t] ~ dbern(p_obs[i,t])
+          p_obs[i,t] <- p[i,t-1]*z[i,t]               
+          
+        } #t
+      } #i
+
+      #-- Derived parameters
+      
+      logit(phi0.female) <- beta.phi0
+      logit(p0.female) <- alpha.p0
+      phi0.male <- exp(beta.phi0 + b.male)/(1 + exp(beta.phi0 + b.male))
+      p0.male <- exp(alpha.p0 + a.male)/(1 + exp(alpha.p0 + a.male))
+      
+
+    } #model
+  ",fill=TRUE)
+  sink()
+  
+#MCMC settings, parameters, initial values  
+  #ni <- 2000; na <- 1000; nb <- 8000; nc <- 3; ni.tot <- ni + nb
+	ni <- 500; na <- 500; nb <- 500; nc <- 3; ni.tot <- ni + nb
+  
+	params <- c('beta.phi0','b.male','b.mnprecip','b.drought','b.int','alpha.p0','a.male','a.precip','psi',
+	            'phi0.female','phi0.male','p0.female','p0.male')
+  
+  inits <- function() {list(beta.phi0=runif(1,0,3),
+                            b.male=runif(1,-1,1),
+                            b.mnprecip=runif(1,-1,1),
+                            b.drought=runif(1,-1,1),
+                            b.int=runif(1,-1,1),
+                            alpha.p0=runif(1,-2,2),
+                            a.male=runif(1,-1,1),
+                            a.precip=runif(1,-1,1),
+                            psi=dunif(1,0,1),
+                            male=ifelse(is.na(male.ind),1,NA),
+                            z=ch.init(as.matrix(cr.mat),first))}
+
+#Run model
+	fit.cjs <- jags(data=tortdata, inits=inits, parameters.to.save=params,
+                  model.file='CJS_CovarsNoTrend_NoREs.txt',
+                  n.chains=nc, n.adapt=na, n.iter=ni.tot, n.burnin=nb,
+                  parallel=T, n.cores=3, DIC=FALSE)  
+  print(fit.cjs)
+
+#-----------------------------------------------------------------------------------------------# 
+# Run CJS model in JAGS with fixed and random effects
+#-----------------------------------------------------------------------------------------------# 	
+#Prep data objects for JAGS
+  tortdata <- list(y=as.matrix(cr.mat),
+                   ntorts=nrow(cr.mat),
+                   nyears=ncol(cr.mat),
+                   first=first,
+                   male=male.ind,
+                   plot=plot.index,
+                   mean.precip=precip.norm,
+                   drought=pdsi24.z,
+                   precip=ppt.mat)
+
+#JAGS model: no covariates, no random effects	
+  sink("CJS_CovarsNoTrend_REs.txt")
+  cat("
+    model{
+      
+      #-- Priors and constraints
+      
+      for (i in 1:ntorts){
+        for(t in first[i]:(nyears-1)){
+        
+          logit(phi[i,t]) <- beta.phi0 + b.male*male[i] + b.mnprecip*mean.precip[plot[i]] + b.drought*drought[plot[i],t] +
+                                b.int*mean.precip[plot[i]]*drought[plot[i],t] + e.lphi.site[i] + e.lphi.time[t]
+          logit(p[i,t]) <- alpha.p0 + a.male*male[i] + a.precip*precip[plot[i],t] + e.lp.site[i] + e.lp.time[t]
+
+        } #t
+        
+        e.lphi.site[i] ~ dnorm(0,tau.lphi.site)
+        e.lp.site[i] ~ dnorm(0,tau.lp.site)
+        
+      }#i   
+      
+      for(t in 1:(nyears-1)){
+        e.lphi.time[t] ~ dnorm(0,tau.lphi.time)
+        e.lp.time[t] ~ dnorm(0,tau.lp.time)
+      }
+      
+      beta.phi0 ~ dlogis(0,1)
+      b.male ~ dnorm(0,0.1)
+      b.mnprecip ~ dnorm(0,0.1)
+      b.drought ~ dnorm(0,0.1)
+      b.int ~ dnorm(0,0.1)
+      alpha.p0 ~ dlogis(0,1)
+      a.male ~ dnorm(0,0.1)
+      a.precip ~ dnorm(0,0.1)      
+      psi ~ dunif(0,1)
+      
+      sigma.lphi.site ~ dunif(0,10)
+      tau.lphi.site <- 1/(sigma.lphi.site*sigma.lphi.site)
+      sigma.lphi.time ~ dunif(0,10)
+      tau.lphi.time <- 1/(sigma.lphi.time*sigma.lphi.time)
+      sigma.lp.site ~ dunif(0,10)
+      tau.lp.site <- 1/(sigma.lp.site*sigma.lp.site)
+      sigma.lp.time ~ dunif(0,10)
+      tau.lp.time <- 1/(sigma.lp.time*sigma.lp.time)
+  
+      #-- Likelihood
+      
+      for(i in 1:ntorts){
+        z[i,first[i]] <- 1
+        male[i] ~ dbern(psi)
+        
+        for (t in (first[i]+1):nyears){              
+        
+          #State process
+          z[i,t] ~ dbern(p_alive[i,t])
+          p_alive[i,t] <- phi[i,t-1]*z[i,t-1]
+          
+          #Observation process
+          y[i,t] ~ dbern(p_obs[i,t])
+          p_obs[i,t] <- p[i,t-1]*z[i,t]               
+          
+        } #t
+      } #i
+
+      #-- Derived parameters
+      
+      logit(phi0.female) <- beta.phi0
+      logit(p0.female) <- alpha.p0
+      phi0.male <- exp(beta.phi0 + b.male)/(1 + exp(beta.phi0 + b.male))
+      p0.male <- exp(alpha.p0 + a.male)/(1 + exp(alpha.p0 + a.male))
+      
+
+    } #model
+  ",fill=TRUE)
+  sink()
+
+#MCMC settings, parameters, initial values  
+  #ni <- 2000; na <- 1000; nb <- 8000; nc <- 3; ni.tot <- ni + nb
+	ni <- 500; na <- 500; nb <- 500; nc <- 3; ni.tot <- ni + nb
+  
+	params <- c('beta.phi0','b.male','b.mnprecip','b.drought','b.int','alpha.p0','a.male','a.precip','psi',
+	            'sigma.lphi.site','sigma.lphi.time','sigma.lp.site','sigma.lp.time',
+	            'phi0.female','phi0.male','p0.female','p0.male')
+  
+  inits <- function() {list(beta.phi0=runif(1,0,3),
+                            b.male=runif(1,-1,1),
+                            b.mnprecip=runif(1,-1,1),
+                            b.drought=runif(1,-1,1),
+                            b.int=runif(1,-1,1),
+                            alpha.p0=runif(1,-2,2),
+                            a.male=runif(1,-1,1),
+                            a.precip=runif(1,-1,1),
+                            psi=dunif(1,0,1),
+                            sigma.lphi.site=dunif(1,0,5),
+                            sigma.lphi.time=dunif(1,0,5),
+                            sigma.lp.site=dunif(1,0,5),
+                            sigma.lp.time=dunif(1,0,5),
+                            male=ifelse(is.na(male.ind),1,NA),
+                            z=ch.init(as.matrix(cr.mat),first))}
+
+#Run model
+	fit.cjs <- jags(data=tortdata, inits=inits, parameters.to.save=params,
+                  model.file='CJS_CovarsNoTrend_REs.txt',
+                  n.chains=nc, n.adapt=na, n.iter=ni.tot, n.burnin=nb,
+                  parallel=T, n.cores=3, DIC=FALSE)  
+	print(fit.cjs)
 
 	
