@@ -1,5 +1,5 @@
 ###################################################################################################################################
-#CJS model for capture-recapture data
+#CJS models for capture-recapture data
 ###################################################################################################################################
 
 library(plyr)
@@ -17,6 +17,7 @@ survs <- read.csv('PlotSurveySchedule.csv',header=TRUE,stringsAsFactors=FALSE)
 pdsi <- read.csv('PDSI.csv',header=TRUE,stringsAsFactors=FALSE)
 precip.norms <- read.csv('Precip_norms.csv',header=TRUE,stringsAsFactors=FALSE)
 precip <- read.csv('Precip_Monthly.csv',header=TRUE,stringsAsFactors=FALSE)
+disttocity <- read.csv('PlotDistToCity.csv',header=TRUE,stringsAsFactors=FALSE)
 
 #-----------------------------------------------------------------------------------------------# 
 # Formatting survey schedule
@@ -208,10 +209,23 @@ precip <- read.csv('Precip_Monthly.csv',header=TRUE,stringsAsFactors=FALSE)
 #-----------------------------------------------------------------------------------------------# 
 # Run CJS model in JAGS with covariates (fixed effects), no random effects
 #-----------------------------------------------------------------------------------------------# 
+#Note: considered adding a trend in survival (like we did in the 2013 paper), but these models
+#had a lot of convergence issues.  Likely problematic given how sparse the data are in later years 
+#(including many consecutive years where no surveys were completed)
+	
 #Formatting individual covariates
 	sex <- cr$sex
 	sex[sex==3] <- NA
 	male.ind <- sex-1
+	
+#Formatting site covariate: distance to nearest "major" city (population > 10,000)
+	names(disttocity)[names(disttocity)=='code'] <- 'plot'
+	disttocity <- disttocity[order(disttocity$plot),]
+	# #Check that plots are in the same order they're found in capture histories
+	# all.equal(unique(cr$plot),unique(disttocity$plot))
+	dist.mn <- mean(disttocity$dist.km)
+	dist.sd <- sd(disttocity$dist.km)
+	distance <- (disttocity$dist.km - dist.mn)/dist.sd
 	
 #Formatting site covariate: precipitation normals
 	precip.norms <- precip.norms[order(precip.norms$plot),]
@@ -278,12 +292,13 @@ precip <- read.csv('Precip_Monthly.csv',header=TRUE,stringsAsFactors=FALSE)
                    first=first,
                    male=male.ind,
                    plot=plot.index,
+                   distance=distance,
                    mean.precip=precip.norm,
                    drought=pdsi24.z,
                    precip=ppt.mat)
 
-#JAGS model: no covariates, no random effects	
-  sink("CJS_CovarsNoTrend_NoREs.txt")
+#JAGS model: covariates, no random effects
+  sink("CJS_Covars_NoREs.txt")
   cat("
     model{
       
@@ -292,8 +307,8 @@ precip <- read.csv('Precip_Monthly.csv',header=TRUE,stringsAsFactors=FALSE)
       for (i in 1:ntorts){
         for(t in first[i]:(nyears-1)){
         
-          logit(phi[i,t]) <- beta.phi0 + b.male*male[i] + b.mnprecip*mean.precip[plot[i]] + b.drought*drought[plot[i],t] +
-                             b.int*mean.precip[plot[i]]*drought[plot[i],t] 
+          logit(phi[i,t]) <- beta.phi0 + b.male*male[i] + b.distance*distance[plot[i]] + b.mnprecip*mean.precip[plot[i]] + 
+                             b.drought*drought[plot[i],t] + b.int*mean.precip[plot[i]]*drought[plot[i],t] 
           logit(p[i,t]) <- alpha.p0 + a.male*male[i] + a.precip*precip[plot[i],t]
 
         } #t
@@ -301,6 +316,7 @@ precip <- read.csv('Precip_Monthly.csv',header=TRUE,stringsAsFactors=FALSE)
       
       beta.phi0 ~ dlogis(0,1)
       b.male ~ dnorm(0,0.1)
+      b.distance ~ dnorm(0,0.1)
       b.mnprecip ~ dnorm(0,0.1)
       b.drought ~ dnorm(0,0.1)
       b.int ~ dnorm(0,0.1)
@@ -344,11 +360,12 @@ precip <- read.csv('Precip_Monthly.csv',header=TRUE,stringsAsFactors=FALSE)
   #ni <- 2000; na <- 1000; nb <- 8000; nc <- 3; ni.tot <- ni + nb
 	ni <- 500; na <- 500; nb <- 500; nc <- 3; ni.tot <- ni + nb
   
-	params <- c('beta.phi0','b.male','b.mnprecip','b.drought','b.int','alpha.p0','a.male','a.precip','psi',
-	            'phi0.female','phi0.male','p0.female','p0.male')
+	params <- c('beta.phi0','b.male','b.distance','b.mnprecip','b.drought','b.int',
+	            'alpha.p0','a.male','a.precip','psi','phi0.female','phi0.male','p0.female','p0.male')
   
   inits <- function() {list(beta.phi0=runif(1,0,3),
                             b.male=runif(1,-1,1),
+                            b.distance=runif(1,-1,1),
                             b.mnprecip=runif(1,-1,1),
                             b.drought=runif(1,-1,1),
                             b.int=runif(1,-1,1),
@@ -360,15 +377,18 @@ precip <- read.csv('Precip_Monthly.csv',header=TRUE,stringsAsFactors=FALSE)
                             z=ch.init(as.matrix(cr.mat),first))}
 
 #Run model
-	fit.cjs <- jags(data=tortdata, inits=inits, parameters.to.save=params,
-                  model.file='CJS_CovarsNoTrend_NoREs.txt',
-                  n.chains=nc, n.adapt=na, n.iter=ni.tot, n.burnin=nb,
-                  parallel=T, n.cores=3, DIC=FALSE)  
-  print(fit.cjs)
+	fit.cjs1 <- jags(data=tortdata, inits=inits, parameters.to.save=params,
+                   model.file='CJS_Covars_NoREs.txt',
+                   n.chains=nc, n.adapt=na, n.iter=ni.tot, n.burnin=nb,
+                   parallel=T, n.cores=3, DIC=FALSE)  
+  print(fit.cjs1)
 
 #-----------------------------------------------------------------------------------------------# 
-# Run CJS model in JAGS with fixed and random effects
-#-----------------------------------------------------------------------------------------------# 	
+# Run CJS model in JAGS with fixed effects and a random site effect in survival model
+#-----------------------------------------------------------------------------------------------# 
+#Note: A model with yearly random effects did not converge, which is not surprising given how
+#sparse the data are in later years.
+  
 #Prep data objects for JAGS
   tortdata <- list(y=as.matrix(cr.mat),
                    ntorts=nrow(cr.mat),
@@ -376,12 +396,13 @@ precip <- read.csv('Precip_Monthly.csv',header=TRUE,stringsAsFactors=FALSE)
                    first=first,
                    male=male.ind,
                    plot=plot.index,
+                   distance=distance,
                    mean.precip=precip.norm,
                    drought=pdsi24.z,
                    precip=ppt.mat)
 
-#JAGS model: no covariates, no random effects	
-  sink("CJS_CovarsNoTrend_REs.txt")
+#JAGS model: covariates, site random effects	
+  sink("CJS_Covars_siteREs.txt")
   cat("
     model{
       
@@ -390,24 +411,19 @@ precip <- read.csv('Precip_Monthly.csv',header=TRUE,stringsAsFactors=FALSE)
       for (i in 1:ntorts){
         for(t in first[i]:(nyears-1)){
         
-          logit(phi[i,t]) <- beta.phi0 + b.male*male[i] + b.mnprecip*mean.precip[plot[i]] + b.drought*drought[plot[i],t] +
-                                b.int*mean.precip[plot[i]]*drought[plot[i],t] + e.lphi.site[i] + e.lphi.time[t]
-          logit(p[i,t]) <- alpha.p0 + a.male*male[i] + a.precip*precip[plot[i],t] + e.lp.site[i] + e.lp.time[t]
+          logit(phi[i,t]) <- beta.phi0 + b.male*male[i] + b.distance*distance[plot[i]] + b.mnprecip*mean.precip[plot[i]] + 
+                             b.drought*drought[plot[i],t] + b.int*mean.precip[plot[i]]*drought[plot[i],t] + e.site[i]
+          logit(p[i,t]) <- alpha.p0 + a.male*male[i] + a.precip*precip[plot[i],t]
 
         } #t
         
-        e.lphi.site[i] ~ dnorm(0,tau.lphi.site)
-        e.lp.site[i] ~ dnorm(0,tau.lp.site)
+        e.site[i] ~ dnorm(0,tau.site)
         
       }#i   
       
-      for(t in 1:(nyears-1)){
-        e.lphi.time[t] ~ dnorm(0,tau.lphi.time)
-        e.lp.time[t] ~ dnorm(0,tau.lp.time)
-      }
-      
       beta.phi0 ~ dlogis(0,1)
       b.male ~ dnorm(0,0.1)
+      b.distance ~ dnorm(0,0.1)
       b.mnprecip ~ dnorm(0,0.1)
       b.drought ~ dnorm(0,0.1)
       b.int ~ dnorm(0,0.1)
@@ -416,15 +432,9 @@ precip <- read.csv('Precip_Monthly.csv',header=TRUE,stringsAsFactors=FALSE)
       a.precip ~ dnorm(0,0.1)      
       psi ~ dunif(0,1)
       
-      sigma.lphi.site ~ dunif(0,10)
-      tau.lphi.site <- 1/(sigma.lphi.site*sigma.lphi.site)
-      sigma.lphi.time ~ dunif(0,10)
-      tau.lphi.time <- 1/(sigma.lphi.time*sigma.lphi.time)
-      sigma.lp.site ~ dunif(0,10)
-      tau.lp.site <- 1/(sigma.lp.site*sigma.lp.site)
-      sigma.lp.time ~ dunif(0,10)
-      tau.lp.time <- 1/(sigma.lp.time*sigma.lp.time)
-  
+      sigma.site ~ dt(0,pow(2.5,-2),1)T(0,)  #Half-cauchy prior
+      tau.site <- 1/(sigma.site*sigma.site)
+
       #-- Likelihood
       
       for(i in 1:ntorts){
@@ -460,12 +470,13 @@ precip <- read.csv('Precip_Monthly.csv',header=TRUE,stringsAsFactors=FALSE)
   #ni <- 2000; na <- 1000; nb <- 8000; nc <- 3; ni.tot <- ni + nb
 	ni <- 500; na <- 500; nb <- 500; nc <- 3; ni.tot <- ni + nb
   
-	params <- c('beta.phi0','b.male','b.mnprecip','b.drought','b.int','alpha.p0','a.male','a.precip','psi',
-	            'sigma.lphi.site','sigma.lphi.time','sigma.lp.site','sigma.lp.time',
+	params <- c('beta.phi0','b.male','b.distance','b.mnprecip','b.drought','b.int',
+	            'alpha.p0','a.male','a.precip','psi','sigma.site','e.site',
 	            'phi0.female','phi0.male','p0.female','p0.male')
   
   inits <- function() {list(beta.phi0=runif(1,0,3),
                             b.male=runif(1,-1,1),
+                            b.distance=runif(1,-1,1),
                             b.mnprecip=runif(1,-1,1),
                             b.drought=runif(1,-1,1),
                             b.int=runif(1,-1,1),
@@ -473,18 +484,15 @@ precip <- read.csv('Precip_Monthly.csv',header=TRUE,stringsAsFactors=FALSE)
                             a.male=runif(1,-1,1),
                             a.precip=runif(1,-1,1),
                             psi=dunif(1,0,1),
-                            sigma.lphi.site=dunif(1,0,5),
-                            sigma.lphi.time=dunif(1,0,5),
-                            sigma.lp.site=dunif(1,0,5),
-                            sigma.lp.time=dunif(1,0,5),
+                            sigma.site=dunif(1,0,5),
                             male=ifelse(is.na(male.ind),1,NA),
                             z=ch.init(as.matrix(cr.mat),first))}
 
 #Run model
-	fit.cjs <- jags(data=tortdata, inits=inits, parameters.to.save=params,
-                  model.file='CJS_CovarsNoTrend_REs.txt',
-                  n.chains=nc, n.adapt=na, n.iter=ni.tot, n.burnin=nb,
-                  parallel=T, n.cores=3, DIC=FALSE)  
-	print(fit.cjs)
+	fit.cjs2 <- jags(data=tortdata, inits=inits, parameters.to.save=params,
+                   model.file='CJS_Covars_siteREs.txt',
+                   n.chains=nc, n.adapt=na, n.iter=ni.tot, n.burnin=nb,
+                   parallel=T, n.cores=3, DIC=FALSE)  
+	print(fit.cjs2)
 
 	
