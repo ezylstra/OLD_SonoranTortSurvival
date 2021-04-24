@@ -386,13 +386,15 @@ disttocity <- read.csv('PlotDistToCity.csv',header=TRUE,stringsAsFactors=FALSE)
 #-----------------------------------------------------------------------------------------------# 
 # Run CJS model in JAGS with fixed effects and a random site effect in survival model
 #-----------------------------------------------------------------------------------------------# 
-#Note: A model with yearly random effects did not converge, which is not surprising given how
-#sparse the data are in later years.
-  
 #Prep data objects for JAGS
+  ntorts <- nrow(cr.mat)             #number of tortoises
+  nyears <- ncol(cr.mat)             #number of occasions
+  nplots <- length(unique(cr$plot))  #number of plots
+  
   tortdata <- list(y=as.matrix(cr.mat),
-                   ntorts=nrow(cr.mat),
-                   nyears=ncol(cr.mat),
+                   ntorts=ntorts,
+                   nyears=nyears,
+                   nplots=nplots,
                    first=first,
                    male=male.ind,
                    plot=plot.index,
@@ -412,14 +414,15 @@ disttocity <- read.csv('PlotDistToCity.csv',header=TRUE,stringsAsFactors=FALSE)
         for(t in first[i]:(nyears-1)){
         
           logit(phi[i,t]) <- beta.phi0 + b.male*male[i] + b.distance*distance[plot[i]] + b.mnprecip*mean.precip[plot[i]] + 
-                             b.drought*drought[plot[i],t] + b.int*mean.precip[plot[i]]*drought[plot[i],t] + e.site[i]
+                             b.drought*drought[plot[i],t] + b.int*mean.precip[plot[i]]*drought[plot[i],t] + e.site[plot[i]]
           logit(p[i,t]) <- alpha.p0 + a.male*male[i] + a.precip*precip[plot[i],t]
 
         } #t
-        
-        e.site[i] ~ dnorm(0,tau.site)
-        
       }#i   
+      
+      for(p in 1:nplots){
+        e.site[p] ~ dnorm(0,tau.site)
+      }
       
       beta.phi0 ~ dlogis(0,1)
       b.male ~ dnorm(0,0.1)
@@ -467,24 +470,24 @@ disttocity <- read.csv('PlotDistToCity.csv',header=TRUE,stringsAsFactors=FALSE)
   sink()
 
 #MCMC settings, parameters, initial values  
-  #ni <- 2000; na <- 1000; nb <- 8000; nc <- 3; ni.tot <- ni + nb
-	ni <- 500; na <- 500; nb <- 500; nc <- 3; ni.tot <- ni + nb
+  ni <- 20000; na <- 2000; nb <- 20000; nt <- 20; nc <- 3; ni.tot <- ni + nb
+	#ni <- 500; na <- 500; nb <- 500; nc <- 3; ni.tot <- ni + nb
   
 	params <- c('beta.phi0','b.male','b.distance','b.mnprecip','b.drought','b.int',
 	            'alpha.p0','a.male','a.precip','psi','sigma.site','e.site',
 	            'phi0.female','phi0.male','p0.female','p0.male')
   
-  inits <- function() {list(beta.phi0=runif(1,0,3),
-                            b.male=runif(1,-1,1),
+  inits <- function() {list(beta.phi0=runif(1,1,3),
+                            b.male=runif(1,-0.5,0.5),
                             b.distance=runif(1,-1,1),
-                            b.mnprecip=runif(1,-1,1),
-                            b.drought=runif(1,-1,1),
-                            b.int=runif(1,-1,1),
-                            alpha.p0=runif(1,-2,2),
-                            a.male=runif(1,-1,1),
-                            a.precip=runif(1,-1,1),
+                            b.mnprecip=runif(1,-0.5,0.5),
+                            b.drought=runif(1,-0.5,0.5),
+                            b.int=runif(1,-0.5,0.5),
+                            alpha.p0=runif(1,0,2),
+                            a.male=runif(1,-0.5,0.5),
+                            a.precip=runif(1,-0.5,0.5),
                             psi=dunif(1,0,1),
-                            sigma.site=dunif(1,0,5),
+                            sigma.site=dunif(1,0,3),
                             male=ifelse(is.na(male.ind),1,NA),
                             z=ch.init(as.matrix(cr.mat),first))}
 
