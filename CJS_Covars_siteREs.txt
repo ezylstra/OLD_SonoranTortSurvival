@@ -1,0 +1,62 @@
+
+    model{
+      
+      #-- Priors and constraints
+      
+      for (i in 1:ntorts){
+        for(t in first[i]:(nyears-1)){
+        
+          logit(phi[i,t]) <- beta.phi0 + b.male*male[i] + b.distance*distance[plot[i]] + b.mnprecip*mean.precip[plot[i]] + 
+                             b.drought*drought[plot[i],t] + b.int*mean.precip[plot[i]]*drought[plot[i],t] + e.site[plot[i]]
+          logit(p[i,t]) <- alpha.p0 + a.male*male[i] + a.precip*precip[plot[i],t]
+
+        } #t
+      }#i   
+      
+      for(p in 1:nplots){
+        e.site[p] ~ dnorm(0,tau.site)
+      }
+      
+      beta.phi0 ~ dlogis(0,1)
+      b.male ~ dnorm(0,0.1)
+      b.distance ~ dnorm(0,0.1)
+      b.mnprecip ~ dnorm(0,0.1)
+      b.drought ~ dnorm(0,0.1)
+      b.int ~ dnorm(0,0.1)
+      alpha.p0 ~ dlogis(0,1)
+      a.male ~ dnorm(0,0.1)
+      a.precip ~ dnorm(0,0.1)      
+      psi ~ dunif(0,1)
+      
+      sigma.site ~ dt(0,pow(2.5,-2),1)T(0,)  #Half-cauchy prior
+      tau.site <- 1/(sigma.site*sigma.site)
+
+      #-- Likelihood
+      
+      for(i in 1:ntorts){
+        z[i,first[i]] <- 1
+        male[i] ~ dbern(psi)
+        
+        for (t in (first[i]+1):nyears){              
+        
+          #State process
+          z[i,t] ~ dbern(p_alive[i,t])
+          p_alive[i,t] <- phi[i,t-1]*z[i,t-1]
+          
+          #Observation process
+          y[i,t] ~ dbern(p_obs[i,t])
+          p_obs[i,t] <- p[i,t-1]*z[i,t]               
+          
+        } #t
+      } #i
+
+      #-- Derived parameters
+      
+      logit(phi0.female) <- beta.phi0
+      logit(p0.female) <- alpha.p0
+      phi0.male <- exp(beta.phi0 + b.male)/(1 + exp(beta.phi0 + b.male))
+      p0.male <- exp(alpha.p0 + a.male)/(1 + exp(alpha.p0 + a.male))
+      
+
+    } #model
+  
