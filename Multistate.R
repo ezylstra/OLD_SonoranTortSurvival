@@ -160,81 +160,81 @@ disttocity <- read.csv('PlotDistToCity.csv',header=TRUE,stringsAsFactors=FALSE)
                    first=first)
   
 #JAGS model: no covariates, no random effects	
-  sink("MS_NoCovars_NoREs.txt")
-  cat("
-    model{
-      
-      #-- Priors and constraints
-
-      alpha.p1 ~ dlogis(0,1)
-      alpha.p2 ~ dlogis(0,1)
-      beta.phi1 ~ dlogis(0,1)
-      beta.phi2 ~ dlogis(0,1)
-      gamma.psi ~ dlogis(0,1)      
-      
-      for (i in 1:ntorts){
-        for(t in first[i]:(nyears-1)){
-
-          logit(p1[i,t]) <- alpha.p1
-          logit(p2[i,t]) <- alpha.p2
-          logit(phi1[i,t]) <- beta.phi1
-          logit(phi2[i,t]) <- beta.phi2
-          logit(psi12[i,t]) <- gamma.psi
-
-          #Define state transition probabilities
-          #First index = states at time t-1, last index = states at time t
-          ps[1,i,t,1] <- phi1[i,t] * (1-psi12[i,t])
-          ps[1,i,t,2] <- phi1[i,t] * psi12[i,t]
-          ps[1,i,t,3] <- 1-phi1[i,t]
-          ps[2,i,t,1] <- 0
-          ps[2,i,t,2] <- phi2[i,t]
-          ps[2,i,t,3] <- 1-phi2[i,t]
-          ps[3,i,t,1] <- 0
-          ps[3,i,t,2] <- 0
-          ps[3,i,t,3] <- 1
-    
-          #Define stage-dependent detection probabilities
-          #First index = states at time t, last index = detection type at time t
-          po[1,i,t,1] <- p1[i,t]
-          po[1,i,t,2] <- 0
-          po[1,i,t,3] <- 1-p1[i,t]
-          po[2,i,t,1] <- 0
-          po[2,i,t,2] <- p2[i,t]
-          po[2,i,t,3] <- 1-p2[i,t]
-          po[3,i,t,1] <- 0
-          po[3,i,t,2] <- 0
-          po[3,i,t,3] <- 1      
-
-        } #t
-      } #i
-
-      #-- Likelihood
-      
-      for(i in 1:ntorts){
-        z[i,first[i]] <- y[i,first[i]]
-        
-        for (t in (first[i]+1):nyears){              
-        
-          #State process: draw State[t] given State[t-1]
-          z[i,t] ~ dcat(ps[z[i,t-1],i,t-1,])
-          
-          #Observation process: draw Obs[t] given State[t]
-          y[i,t] ~ dcat(po[z[i,t],i,t-1,])             
-          
-        } #t
-      } #i
-
-      #-- Derived parameters
-      
-      logit(psi12.mn) <- gamma.psi
-      logit(phi1.mn) <- beta.phi1
-      logit(phi2.mn) <- beta.phi2
-      logit(p1.mn) <- alpha.p1
-      logit(p2.mn) <- alpha.p2
-
-    } #model
-  ",fill=TRUE)
-  sink()
+  # sink("MS_NoCovars_NoREs.txt")
+  # cat("
+  #   model{
+  #     
+  #     #-- Priors and constraints
+  # 
+  #     alpha.p1 ~ dlogis(0,1)
+  #     alpha.p2 ~ dlogis(0,1)
+  #     beta.phi1 ~ dlogis(0,1)
+  #     beta.phi2 ~ dlogis(0,1)
+  #     gamma.psi ~ dlogis(0,1)      
+  #     
+  #     for (i in 1:ntorts){
+  #       for(t in first[i]:(nyears-1)){
+  # 
+  #         logit(p1[i,t]) <- alpha.p1
+  #         logit(p2[i,t]) <- alpha.p2
+  #         logit(phi1[i,t]) <- beta.phi1
+  #         logit(phi2[i,t]) <- beta.phi2
+  #         logit(psi12[i,t]) <- gamma.psi
+  # 
+  #         #Define state transition probabilities
+  #         #First index = states at time t-1, last index = states at time t
+  #         ps[1,i,t,1] <- phi1[i,t] * (1-psi12[i,t])
+  #         ps[1,i,t,2] <- phi1[i,t] * psi12[i,t]
+  #         ps[1,i,t,3] <- 1-phi1[i,t]
+  #         ps[2,i,t,1] <- 0
+  #         ps[2,i,t,2] <- phi2[i,t]
+  #         ps[2,i,t,3] <- 1-phi2[i,t]
+  #         ps[3,i,t,1] <- 0
+  #         ps[3,i,t,2] <- 0
+  #         ps[3,i,t,3] <- 1
+  #   
+  #         #Define stage-dependent detection probabilities
+  #         #First index = states at time t, last index = detection type at time t
+  #         po[1,i,t,1] <- p1[i,t]
+  #         po[1,i,t,2] <- 0
+  #         po[1,i,t,3] <- 1-p1[i,t]
+  #         po[2,i,t,1] <- 0
+  #         po[2,i,t,2] <- p2[i,t]
+  #         po[2,i,t,3] <- 1-p2[i,t]
+  #         po[3,i,t,1] <- 0
+  #         po[3,i,t,2] <- 0
+  #         po[3,i,t,3] <- 1      
+  # 
+  #       } #t
+  #     } #i
+  # 
+  #     #-- Likelihood
+  #     
+  #     for(i in 1:ntorts){
+  #       z[i,first[i]] <- y[i,first[i]]
+  #       
+  #       for (t in (first[i]+1):nyears){              
+  #       
+  #         #State process: draw State[t] given State[t-1]
+  #         z[i,t] ~ dcat(ps[z[i,t-1],i,t-1,])
+  #         
+  #         #Observation process: draw Obs[t] given State[t]
+  #         y[i,t] ~ dcat(po[z[i,t],i,t-1,])             
+  #         
+  #       } #t
+  #     } #i
+  # 
+  #     #-- Derived parameters
+  #     
+  #     logit(psi12.mn) <- gamma.psi
+  #     logit(phi1.mn) <- beta.phi1
+  #     logit(phi2.mn) <- beta.phi2
+  #     logit(p1.mn) <- alpha.p1
+  #     logit(p2.mn) <- alpha.p2
+  # 
+  #   } #model
+  # ",fill=TRUE)
+  # sink()
 
 #MCMC settings, parameters, initial values  
   ni <- 20000; na <- 2000; nb <- 10000; nc <- 3; ni.tot <- ni + nb
@@ -251,11 +251,11 @@ disttocity <- read.csv('PlotDistToCity.csv',header=TRUE,stringsAsFactors=FALSE)
                             z=ch.init(as.matrix(cr.mat),first1,first2))}
 
 #Run model
-	fit.ms0 <- jags(data=tortdata, inits=inits, parameters.to.save=params,
-                  model.file='MS_NoCovars_NoREs.txt',
-                  n.chains=nc, n.adapt=na, n.iter=ni.tot, n.burnin=nb,
-                  parallel=T, n.cores=3, DIC=FALSE)  
-	print(fit.ms0)
+# 	fit.ms0 <- jags(data=tortdata, inits=inits, parameters.to.save=params,
+#                   model.file='MS_NoCovars_NoREs.txt',
+#                   n.chains=nc, n.adapt=na, n.iter=ni.tot, n.burnin=nb,
+#                   parallel=T, n.cores=3, DIC=FALSE)  
+# 	print(fit.ms0)
 
 #-----------------------------------------------------------------------------------------------# 
 # Run multistate model in JAGS, with covariates (fixed effects), no random effects
@@ -348,100 +348,100 @@ disttocity <- read.csv('PlotDistToCity.csv',header=TRUE,stringsAsFactors=FALSE)
                    precip=ppt.mat)
 
 #JAGS model: covariates on adult and juvenile parameters (assuming constant transition rates)	
-  sink("MS_CovarsAdultJuv.txt")
-  cat("
-    model{
-
-      #-- Priors and constraints
-
-      alpha.p1 ~ dlogis(0,1)
-      alpha.p2 ~ dlogis(0,1)
-      beta.phi1 ~ dlogis(0,1)
-      beta.phi2 ~ dlogis(0,1)
-      gamma.psi ~ dlogis(0,1)
-
-      a1.precip ~ dnorm(0,0.1)
-      a2.male ~ dnorm(0,0.1)
-      a2.precip ~ dnorm(0,0.1)
-      b1.mnprecip ~ dnorm(0,0.1)
-      b2.male ~ dnorm(0,0.1)
-      b2.distance ~ dnorm(0,0.1)
-      b2.mnprecip ~ dnorm(0,0.1)
-      b2.drought ~ dnorm(0,0.1)
-      b2.int ~ dnorm(0,0.1)
-      psi.male ~ dunif(0,1)
-
-      for (i in 1:ntorts){
-        for(t in first[i]:(nyears-1)){
-
-          logit(p1[i,t]) <- alpha.p1 + a1.precip*precip[plot[i],t]
-          logit(phi1[i,t]) <- beta.phi1 + b1.mnprecip*mean.precip[plot[i]]
-
-          logit(psi12[i,t]) <- gamma.psi
-
-          logit(p2[i,t]) <- alpha.p2 + a2.male*male[i] + a2.precip*precip[plot[i],t]
-          logit(phi2[i,t]) <- beta.phi2 + b2.male*male[i] + b2.distance*distance[plot[i]] +
-                              b2.mnprecip*mean.precip[plot[i]] + b2.drought*drought[plot[i],t] +
-                              b2.int*mean.precip[plot[i]]*drought[plot[i],t]
-
-          #Define state transition probabilities
-          #First index = states at time t-1, last index = states at time t
-          ps[1,i,t,1] <- phi1[i,t] * (1-psi12[i,t])
-          ps[1,i,t,2] <- phi1[i,t] * psi12[i,t]
-          ps[1,i,t,3] <- 1-phi1[i,t]
-          ps[2,i,t,1] <- 0
-          ps[2,i,t,2] <- phi2[i,t]
-          ps[2,i,t,3] <- 1-phi2[i,t]
-          ps[3,i,t,1] <- 0
-          ps[3,i,t,2] <- 0
-          ps[3,i,t,3] <- 1
-
-          #Define stage-dependent detection probabilities
-          #First index = states at time t, last index = detection type at time t
-          po[1,i,t,1] <- p1[i,t]
-          po[1,i,t,2] <- 0
-          po[1,i,t,3] <- 1-p1[i,t]
-          po[2,i,t,1] <- 0
-          po[2,i,t,2] <- p2[i,t]
-          po[2,i,t,3] <- 1-p2[i,t]
-          po[3,i,t,1] <- 0
-          po[3,i,t,2] <- 0
-          po[3,i,t,3] <- 1
-
-        } #t
-      } #i
-
-      #-- Likelihood
-
-      for(i in 1:ntorts){
-        z[i,first[i]] <- y[i,first[i]]
-        male[i] ~ dbern(psi.male)
-
-        for (t in (first[i]+1):nyears){
-
-          #State process: draw State[t] given State[t-1]
-          z[i,t] ~ dcat(ps[z[i,t-1],i,t-1,])
-
-          #Observation process: draw Obs[t] given State[t]
-          y[i,t] ~ dcat(po[z[i,t],i,t-1,])
-
-        } #t
-      } #i
-
-      #-- Derived parameters
-
-      logit(psi12.mn) <- gamma.psi
-      logit(phi1.mn) <- beta.phi1
-      logit(p1.mn) <- alpha.p1
-
-      phi2.f <- exp(beta.phi2)/(1 + exp(beta.phi2))
-      phi2.m <- exp(beta.phi2 + b2.male)/(1 + exp(beta.phi2 + b2.male))
-      p2.f <- exp(alpha.p2)/(1 + exp(alpha.p2))
-      p2.m <- exp(alpha.p2 + a2.male)/(1 + exp(alpha.p2 + a2.male))
-
-    } #model
-  ",fill=TRUE)
-  sink()
+  # sink("MS_CovarsAdultJuv.txt")
+  # cat("
+  #   model{
+  # 
+  #     #-- Priors and constraints
+  # 
+  #     alpha.p1 ~ dlogis(0,1)
+  #     alpha.p2 ~ dlogis(0,1)
+  #     beta.phi1 ~ dlogis(0,1)
+  #     beta.phi2 ~ dlogis(0,1)
+  #     gamma.psi ~ dlogis(0,1)
+  # 
+  #     a1.precip ~ dnorm(0,0.1)
+  #     a2.male ~ dnorm(0,0.1)
+  #     a2.precip ~ dnorm(0,0.1)
+  #     b1.mnprecip ~ dnorm(0,0.1)
+  #     b2.male ~ dnorm(0,0.1)
+  #     b2.distance ~ dnorm(0,0.1)
+  #     b2.mnprecip ~ dnorm(0,0.1)
+  #     b2.drought ~ dnorm(0,0.1)
+  #     b2.int ~ dnorm(0,0.1)
+  #     psi.male ~ dunif(0,1)
+  # 
+  #     for (i in 1:ntorts){
+  #       for(t in first[i]:(nyears-1)){
+  # 
+  #         logit(p1[i,t]) <- alpha.p1 + a1.precip*precip[plot[i],t]
+  #         logit(phi1[i,t]) <- beta.phi1 + b1.mnprecip*mean.precip[plot[i]]
+  # 
+  #         logit(psi12[i,t]) <- gamma.psi
+  # 
+  #         logit(p2[i,t]) <- alpha.p2 + a2.male*male[i] + a2.precip*precip[plot[i],t]
+  #         logit(phi2[i,t]) <- beta.phi2 + b2.male*male[i] + b2.distance*distance[plot[i]] +
+  #                             b2.mnprecip*mean.precip[plot[i]] + b2.drought*drought[plot[i],t] +
+  #                             b2.int*mean.precip[plot[i]]*drought[plot[i],t]
+  # 
+  #         #Define state transition probabilities
+  #         #First index = states at time t-1, last index = states at time t
+  #         ps[1,i,t,1] <- phi1[i,t] * (1-psi12[i,t])
+  #         ps[1,i,t,2] <- phi1[i,t] * psi12[i,t]
+  #         ps[1,i,t,3] <- 1-phi1[i,t]
+  #         ps[2,i,t,1] <- 0
+  #         ps[2,i,t,2] <- phi2[i,t]
+  #         ps[2,i,t,3] <- 1-phi2[i,t]
+  #         ps[3,i,t,1] <- 0
+  #         ps[3,i,t,2] <- 0
+  #         ps[3,i,t,3] <- 1
+  # 
+  #         #Define stage-dependent detection probabilities
+  #         #First index = states at time t, last index = detection type at time t
+  #         po[1,i,t,1] <- p1[i,t]
+  #         po[1,i,t,2] <- 0
+  #         po[1,i,t,3] <- 1-p1[i,t]
+  #         po[2,i,t,1] <- 0
+  #         po[2,i,t,2] <- p2[i,t]
+  #         po[2,i,t,3] <- 1-p2[i,t]
+  #         po[3,i,t,1] <- 0
+  #         po[3,i,t,2] <- 0
+  #         po[3,i,t,3] <- 1
+  # 
+  #       } #t
+  #     } #i
+  # 
+  #     #-- Likelihood
+  # 
+  #     for(i in 1:ntorts){
+  #       z[i,first[i]] <- y[i,first[i]]
+  #       male[i] ~ dbern(psi.male)
+  # 
+  #       for (t in (first[i]+1):nyears){
+  # 
+  #         #State process: draw State[t] given State[t-1]
+  #         z[i,t] ~ dcat(ps[z[i,t-1],i,t-1,])
+  # 
+  #         #Observation process: draw Obs[t] given State[t]
+  #         y[i,t] ~ dcat(po[z[i,t],i,t-1,])
+  # 
+  #       } #t
+  #     } #i
+  # 
+  #     #-- Derived parameters
+  # 
+  #     logit(psi12.mn) <- gamma.psi
+  #     logit(phi1.mn) <- beta.phi1
+  #     logit(p1.mn) <- alpha.p1
+  # 
+  #     phi2.f <- exp(beta.phi2)/(1 + exp(beta.phi2))
+  #     phi2.m <- exp(beta.phi2 + b2.male)/(1 + exp(beta.phi2 + b2.male))
+  #     p2.f <- exp(alpha.p2)/(1 + exp(alpha.p2))
+  #     p2.m <- exp(alpha.p2 + a2.male)/(1 + exp(alpha.p2 + a2.male))
+  # 
+  #   } #model
+  # ",fill=TRUE)
+  # sink()
   
 #MCMC settings, parameters, initial values  
   ni <- 20000; na <- 2000; nb <- 10000; nc <- 3; ni.tot <- ni + nb
@@ -474,11 +474,11 @@ disttocity <- read.csv('PlotDistToCity.csv',header=TRUE,stringsAsFactors=FALSE)
                             z=ch.init(as.matrix(cr.mat),first1,first2))}
   
 #Run model
-	fit.ms1 <- jags(data=tortdata, inits=inits, parameters.to.save=params,
-                  model.file='MS_CovarsAdultJuv.txt',
-                  n.chains=nc, n.adapt=na, n.iter=ni.tot, n.burnin=nb,
-                  parallel=T, n.cores=3, DIC=FALSE)  
-	print(fit.ms1)  
+# 	fit.ms1 <- jags(data=tortdata, inits=inits, parameters.to.save=params,
+#                   model.file='MS_CovarsAdultJuv.txt',
+#                   n.chains=nc, n.adapt=na, n.iter=ni.tot, n.burnin=nb,
+#                   parallel=T, n.cores=3, DIC=FALSE)  
+# 	print(fit.ms1)  
 	
 #-----------------------------------------------------------------------------------------------# 
 # Run multistate model in JAGS, with covariates (fixed effects) and random site effects
@@ -501,107 +501,107 @@ disttocity <- read.csv('PlotDistToCity.csv',header=TRUE,stringsAsFactors=FALSE)
                    precip=ppt.mat)
 
 #JAGS model: covariates on adult and juvenile parameters, random site effects	
-  sink("MS_CovarsAdultJuv_siteREs.txt")
-  cat("
-    model{
-
-      #-- Priors and constraints
-
-      alpha.p1 ~ dlogis(0,1)
-      alpha.p2 ~ dlogis(0,1)
-      beta.phi1 ~ dlogis(0,1)
-      beta.phi2 ~ dlogis(0,1)
-      gamma.psi ~ dlogis(0,1)
-
-      a1.precip ~ dnorm(0,0.1)
-      a2.male ~ dnorm(0,0.1)
-      a2.precip ~ dnorm(0,0.1)
-      b1.mnprecip ~ dnorm(0,0.1)
-      b2.male ~ dnorm(0,0.1)
-      b2.distance ~ dnorm(0,0.1)
-      b2.mnprecip ~ dnorm(0,0.1)
-      b2.drought ~ dnorm(0,0.1)
-      b2.int ~ dnorm(0,0.1)
-      psi.male ~ dunif(0,1)
-
-      sigma.site ~ dt(0,pow(2.5,-2),1)T(0,)  #Half-cauchy prior
-      tau.site <- 1/(sigma.site*sigma.site)
-
-      for(p in 1:nplots){
-        e.site[p] ~ dnorm(0,tau.site)
-      }
-
-      for (i in 1:ntorts){
-        for(t in first[i]:(nyears-1)){
-
-          logit(p1[i,t]) <- alpha.p1 + a1.precip*precip[plot[i],t]
-          logit(phi1[i,t]) <- beta.phi1 + b1.mnprecip*mean.precip[plot[i]]
-
-          logit(psi12[i,t]) <- gamma.psi
-
-          logit(p2[i,t]) <- alpha.p2 + a2.male*male[i] + a2.precip*precip[plot[i],t]
-          logit(phi2[i,t]) <- beta.phi2 + b2.male*male[i] + b2.distance*distance[plot[i]] +
-                              b2.mnprecip*mean.precip[plot[i]] + b2.drought*drought[plot[i],t] +
-                              b2.int*mean.precip[plot[i]]*drought[plot[i],t] + e.site[plot[i]]
-
-          #Define state transition probabilities
-          #First index = states at time t-1, last index = states at time t
-          ps[1,i,t,1] <- phi1[i,t] * (1-psi12[i,t])
-          ps[1,i,t,2] <- phi1[i,t] * psi12[i,t]
-          ps[1,i,t,3] <- 1-phi1[i,t]
-          ps[2,i,t,1] <- 0
-          ps[2,i,t,2] <- phi2[i,t]
-          ps[2,i,t,3] <- 1-phi2[i,t]
-          ps[3,i,t,1] <- 0
-          ps[3,i,t,2] <- 0
-          ps[3,i,t,3] <- 1
-
-          #Define stage-dependent detection probabilities
-          #First index = states at time t, last index = detection type at time t
-          po[1,i,t,1] <- p1[i,t]
-          po[1,i,t,2] <- 0
-          po[1,i,t,3] <- 1-p1[i,t]
-          po[2,i,t,1] <- 0
-          po[2,i,t,2] <- p2[i,t]
-          po[2,i,t,3] <- 1-p2[i,t]
-          po[3,i,t,1] <- 0
-          po[3,i,t,2] <- 0
-          po[3,i,t,3] <- 1
-
-        } #t
-      } #i
-
-      #-- Likelihood
-
-      for(i in 1:ntorts){
-        z[i,first[i]] <- y[i,first[i]]
-        male[i] ~ dbern(psi.male)
-
-        for (t in (first[i]+1):nyears){
-
-          #State process: draw State[t] given State[t-1]
-          z[i,t] ~ dcat(ps[z[i,t-1],i,t-1,])
-
-          #Observation process: draw Obs[t] given State[t]
-          y[i,t] ~ dcat(po[z[i,t],i,t-1,])
-
-        } #t
-      } #i
-
-      #-- Derived parameters
-
-      logit(psi12.mn) <- gamma.psi
-      logit(phi1.mn) <- beta.phi1
-      logit(p1.mn) <- alpha.p1
-
-      phi2.f <- exp(beta.phi2)/(1 + exp(beta.phi2))
-      phi2.m <- exp(beta.phi2 + b2.male)/(1 + exp(beta.phi2 + b2.male))
-      p2.f <- exp(alpha.p2)/(1 + exp(alpha.p2))
-      p2.m <- exp(alpha.p2 + a2.male)/(1 + exp(alpha.p2 + a2.male))
-
-    } #model
-  ",fill=TRUE)
-  sink()
+  # sink("MS_CovarsAdultJuv_siteREs.txt")
+  # cat("
+  #   model{
+  # 
+  #     #-- Priors and constraints
+  # 
+  #     alpha.p1 ~ dlogis(0,1)
+  #     alpha.p2 ~ dlogis(0,1)
+  #     beta.phi1 ~ dlogis(0,1)
+  #     beta.phi2 ~ dlogis(0,1)
+  #     gamma.psi ~ dlogis(0,1)
+  # 
+  #     a1.precip ~ dnorm(0,0.1)
+  #     a2.male ~ dnorm(0,0.1)
+  #     a2.precip ~ dnorm(0,0.1)
+  #     b1.mnprecip ~ dnorm(0,0.1)
+  #     b2.male ~ dnorm(0,0.1)
+  #     b2.distance ~ dnorm(0,0.1)
+  #     b2.mnprecip ~ dnorm(0,0.1)
+  #     b2.drought ~ dnorm(0,0.1)
+  #     b2.int ~ dnorm(0,0.1)
+  #     psi.male ~ dunif(0,1)
+  # 
+  #     sigma.site ~ dt(0,pow(2.5,-2),1)T(0,)  #Half-cauchy prior
+  #     tau.site <- 1/(sigma.site*sigma.site)
+  # 
+  #     for(p in 1:nplots){
+  #       e.site[p] ~ dnorm(0,tau.site)
+  #     }
+  # 
+  #     for (i in 1:ntorts){
+  #       for(t in first[i]:(nyears-1)){
+  # 
+  #         logit(p1[i,t]) <- alpha.p1 + a1.precip*precip[plot[i],t]
+  #         logit(phi1[i,t]) <- beta.phi1 + b1.mnprecip*mean.precip[plot[i]]
+  # 
+  #         logit(psi12[i,t]) <- gamma.psi
+  # 
+  #         logit(p2[i,t]) <- alpha.p2 + a2.male*male[i] + a2.precip*precip[plot[i],t]
+  #         logit(phi2[i,t]) <- beta.phi2 + b2.male*male[i] + b2.distance*distance[plot[i]] +
+  #                             b2.mnprecip*mean.precip[plot[i]] + b2.drought*drought[plot[i],t] +
+  #                             b2.int*mean.precip[plot[i]]*drought[plot[i],t] + e.site[plot[i]]
+  # 
+  #         #Define state transition probabilities
+  #         #First index = states at time t-1, last index = states at time t
+  #         ps[1,i,t,1] <- phi1[i,t] * (1-psi12[i,t])
+  #         ps[1,i,t,2] <- phi1[i,t] * psi12[i,t]
+  #         ps[1,i,t,3] <- 1-phi1[i,t]
+  #         ps[2,i,t,1] <- 0
+  #         ps[2,i,t,2] <- phi2[i,t]
+  #         ps[2,i,t,3] <- 1-phi2[i,t]
+  #         ps[3,i,t,1] <- 0
+  #         ps[3,i,t,2] <- 0
+  #         ps[3,i,t,3] <- 1
+  # 
+  #         #Define stage-dependent detection probabilities
+  #         #First index = states at time t, last index = detection type at time t
+  #         po[1,i,t,1] <- p1[i,t]
+  #         po[1,i,t,2] <- 0
+  #         po[1,i,t,3] <- 1-p1[i,t]
+  #         po[2,i,t,1] <- 0
+  #         po[2,i,t,2] <- p2[i,t]
+  #         po[2,i,t,3] <- 1-p2[i,t]
+  #         po[3,i,t,1] <- 0
+  #         po[3,i,t,2] <- 0
+  #         po[3,i,t,3] <- 1
+  # 
+  #       } #t
+  #     } #i
+  # 
+  #     #-- Likelihood
+  # 
+  #     for(i in 1:ntorts){
+  #       z[i,first[i]] <- y[i,first[i]]
+  #       male[i] ~ dbern(psi.male)
+  # 
+  #       for (t in (first[i]+1):nyears){
+  # 
+  #         #State process: draw State[t] given State[t-1]
+  #         z[i,t] ~ dcat(ps[z[i,t-1],i,t-1,])
+  # 
+  #         #Observation process: draw Obs[t] given State[t]
+  #         y[i,t] ~ dcat(po[z[i,t],i,t-1,])
+  # 
+  #       } #t
+  #     } #i
+  # 
+  #     #-- Derived parameters
+  # 
+  #     logit(psi12.mn) <- gamma.psi
+  #     logit(phi1.mn) <- beta.phi1
+  #     logit(p1.mn) <- alpha.p1
+  # 
+  #     phi2.f <- exp(beta.phi2)/(1 + exp(beta.phi2))
+  #     phi2.m <- exp(beta.phi2 + b2.male)/(1 + exp(beta.phi2 + b2.male))
+  #     p2.f <- exp(alpha.p2)/(1 + exp(alpha.p2))
+  #     p2.m <- exp(alpha.p2 + a2.male)/(1 + exp(alpha.p2 + a2.male))
+  # 
+  #   } #model
+  # ",fill=TRUE)
+  # sink()
 
 #MCMC settings, parameters, initial values  
   ni <- 20000; na <- 2000; nb <- 10000; nc <- 3; ni.tot <- ni + nb
@@ -636,11 +636,77 @@ disttocity <- read.csv('PlotDistToCity.csv',header=TRUE,stringsAsFactors=FALSE)
                             z=ch.init(as.matrix(cr.mat),first1,first2))}
 
 #Run model
-	fit.ms2 <- jags(data=tortdata, inits=inits, parameters.to.save=params,
-                  model.file='MS_CovarsAdultJuv_siteREs.txt',
-                  n.chains=nc, n.adapt=na, n.iter=ni.tot, n.burnin=nb,
-                  parallel=T, n.cores=3, DIC=FALSE)  
-	print(fit.ms2)  
+# 	fit.ms2 <- jags(data=tortdata, inits=inits, parameters.to.save=params,
+#                   model.file='MS_CovarsAdultJuv_siteREs.txt',
+#                   n.chains=nc, n.adapt=na, n.iter=ni.tot, n.burnin=nb,
+#                   parallel=T, n.cores=3, DIC=FALSE)  
+# 	print(fit.ms2)  
 	
+#-----------------------------------------------------------------------------------------------# 
+# Calculating population growth rates 
+#-----------------------------------------------------------------------------------------------#	
+#Start with a simple case, where we assume a known, fixed recruitment rate: 0.32 female/female/yr (Campbell et al. 2018)
+
+#Load JAGS object from previous run of a multi-state model:
+  load('JAGSFit_MS_CovarsAdultJuv_2021-04-24.Rdata')
+  
+#Create a matrix of posterior samples:
+  out <- fit.ms$samples
+  comb <- combine.mcmc(out)
+  niter <- 1000
+  sample <- sample(1:nrow(comb),size=niter,replace=FALSE)
+  phi1.s <- comb[sample,c('beta.phi1','b1.mnprecip')]
+  phi2.s <- comb[sample,c('beta.phi2','b2.distance','b2.mnprecip','b2.drought','b2.int')]
+  psi12.s <- comb[sample,c('gamma.psi')]
+
+#Gather plot-specific covariate values (and standardize values)
+  plotcovs <- join(disttocity[,c('plot','dist.km')],precip.norms,by='plot')
+  plotcovs$dist.z <- (plotcovs$dist.km - dist.mn)/dist.sd
+  plotcovs$mnprecip.z <- (plotcovs$ppt.mm - precipnorm.mn)/precipnorm.sd
+  #For each plot, using 3 drought values (-3, 0, +3)
+  phi.Xdf <- plotcovs[rep(seq_len(nrow(plotcovs)),each=3),] 
+  phi.Xdf$drought <- rep(c(-3,0,3),nrow(plotcovs))
+  phi.Xdf$drought.z <- (phi.Xdf$drought - pdsi24.mn)/pdsi24.sd
+  phi.Xdf$int.z <- phi.Xdf$mnprecip.z*phi.Xdf$drought.z
+  
+  #Create a matrix of covariates values for juvenile survival (including a column of 1's for the intercept)
+  phi1.X <- as.matrix(phi2.Xdf[,c('mnprecip.z')])
+  phi1.X <- cbind(rep(1,nrow(phi1.X)),phi1.X)
+  
+  #Create a matrix of covariates values for adult survival (including a column of 1's for the intercept)  
+  phi2.X <- as.matrix(phi2.Xdf[,c('dist.z','mnprecip.z','drought.z','int.z')])
+  phi2.X <- cbind(rep(1,nrow(phi2.X)),phi2.X)
+  
+#Calculate survival estimates for each plot-drought combination, iteration
+  lphi1 <- phi1.X %*% t(phi1.s)
+  phi1 <- exp(lphi1)/(1+exp(lphi1))
+  lphi2 <- phi2.X %*% t(phi2.s)
+  phi2 <- exp(lphi2)/(1+exp(lphi2))
+  
+#Calculate transition estimates for each iteration
+  psi12 <- exp(psi12.s)
+  
+#Calculate population projection matrices, and lambda values, for each plot-drought combination & iteration
+  lambda <- matrix(NA,nrow=nrow(phi2),ncol=niter)
+  
+  for(i in 1:nrow(phi2)){ 
+    for (j in 1:niter){
+      proj.mat <- matrix(c(phi1[i,j]*(1-psi12[j]), 0.32,
+                           phi1[i,j]*psi12[j], phi2[i,j]),
+                         nrow=2,ncol=2,byrow=TRUE)
+      lambda[i,j] <- eigen(proj.mat)$values[1]
+    }
+  }
+  
+#Summarize distributions of lambda values for each plot-drought combination
+  lambda.df <- phi.Xdf[,c('plot','drought')]
+  lambda.df$mn <- apply(lambda,1,mean)
+  lambda.df$q0.025 <- apply(lambda,1,quantile,0.025)
+  lambda.df$q0.05 <- apply(lambda,1,quantile,0.05)
+  lambda.df$q0.5 <- apply(lambda,1,quantile,0.5)
+  lambda.df$q0.95 <- apply(lambda,1,quantile,0.95)
+  lambda.df$q0.975 <- apply(lambda,1,quantile,0.975)
+  (lambda.df <- lambda.df[with(lambda.df,order(drought,plot)),])
+
 	
 	
