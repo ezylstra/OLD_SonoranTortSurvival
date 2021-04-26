@@ -21,7 +21,7 @@
       b.int ~ dnorm(0,0.1)
       alpha.p0 ~ dlogis(0,1)
       a.male ~ dnorm(0,0.1)
-      a.precip ~ dnorm(0,0.1)      
+      a.precip ~ dnorm(0,0.1)
       psi ~ dunif(0,1)
   
       #-- Likelihood

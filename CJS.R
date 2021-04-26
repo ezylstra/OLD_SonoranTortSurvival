@@ -144,50 +144,50 @@ disttocity <- read.csv('PlotDistToCity.csv',header=TRUE,stringsAsFactors=FALSE)
                    first=first)
 
 #JAGS model: no covariates, no random effects	
-  sink("CJS_NoCovars_NoREs.txt")
-  cat("
-    model{
-      
-      #-- Priors and constraints
-      
-      for (i in 1:ntorts){
-        for(t in first[i]:(nyears-1)){
-        
-          logit(phi[i,t]) <- beta.phi0
-          logit(p[i,t]) <- alpha.p0
-
-        } #t
-      }#i   
-      
-      beta.phi0 ~ dlogis(0,1)
-      alpha.p0 ~ dlogis(0,1)
-
-      #-- Likelihood
-      
-      for(i in 1:ntorts){
-        z[i,first[i]] <- 1
-        
-        for (t in (first[i]+1):nyears){              
-        
-          #State process
-          z[i,t] ~ dbern(p_alive[i,t])
-          p_alive[i,t] <- phi[i,t-1]*z[i,t-1]
-          
-          #Observation process
-          y[i,t] ~ dbern(p_obs[i,t])
-          p_obs[i,t] <- p[i,t-1]*z[i,t]               
-          
-        } #t
-      } #i
-
-      #-- Derived parameters
-      
-      logit(phi0) <- beta.phi0
-      logit(p0) <- alpha.p0
-
-    } #model
-  ",fill=TRUE)
-  sink()
+  # sink("CJS_NoCovars_NoREs.txt")
+  # cat("
+  #   model{
+  #     
+  #     #-- Priors and constraints
+  #     
+  #     for (i in 1:ntorts){
+  #       for(t in first[i]:(nyears-1)){
+  #       
+  #         logit(phi[i,t]) <- beta.phi0
+  #         logit(p[i,t]) <- alpha.p0
+  # 
+  #       } #t
+  #     }#i   
+  #     
+  #     beta.phi0 ~ dlogis(0,1)
+  #     alpha.p0 ~ dlogis(0,1)
+  # 
+  #     #-- Likelihood
+  #     
+  #     for(i in 1:ntorts){
+  #       z[i,first[i]] <- 1
+  #       
+  #       for (t in (first[i]+1):nyears){              
+  #       
+  #         #State process
+  #         z[i,t] ~ dbern(p_alive[i,t])
+  #         p_alive[i,t] <- phi[i,t-1]*z[i,t-1]
+  #         
+  #         #Observation process
+  #         y[i,t] ~ dbern(p_obs[i,t])
+  #         p_obs[i,t] <- p[i,t-1]*z[i,t]               
+  #         
+  #       } #t
+  #     } #i
+  # 
+  #     #-- Derived parameters
+  #     
+  #     logit(phi0) <- beta.phi0
+  #     logit(p0) <- alpha.p0
+  # 
+  #   } #model
+  # ",fill=TRUE)
+  # sink()
   
 #MCMC settings, parameters, initial values  
   ni <- 2000; na <- 1000; nb <- 8000; nc <- 3; ni.tot <- ni + nb
@@ -207,12 +207,8 @@ disttocity <- read.csv('PlotDistToCity.csv',header=TRUE,stringsAsFactors=FALSE)
 	print(fit.cjs0)
   
 #-----------------------------------------------------------------------------------------------# 
-# Run CJS model in JAGS with covariates (fixed effects), no random effects
+# Run CJS model in JAGS with covariates (except survey effort), no random effects
 #-----------------------------------------------------------------------------------------------# 
-#Note: considered adding a trend in survival (like we did in the 2013 paper), but these models
-#had a lot of convergence issues.  Likely problematic given how sparse the data are in later years 
-#(including many consecutive years where no surveys were completed)
-	
 #Formatting individual covariates
 	sex <- cr$sex
 	sex[sex==3] <- NA
@@ -280,7 +276,7 @@ disttocity <- read.csv('PlotDistToCity.csv',header=TRUE,stringsAsFactors=FALSE)
 	# ddply(precip.aj,.(plot),summarize,mn=mean(ppt.z),sd=sd(ppt.z))
 	ppt.df <- dcast(precip.aj,plot~season,value.var='ppt.z')
 	ppt.mat <- as.matrix(ppt.df[,2:ncol(ppt.df)])
-	
+
 #Plot index for each tortoise
 	plots <- data.frame(plot=unique(cr$plot),plot.index=1:length(unique(cr$plot)))
   plot.index <- plots$plot.index[match(cr$plot,plots$plot)]	
@@ -297,7 +293,7 @@ disttocity <- read.csv('PlotDistToCity.csv',header=TRUE,stringsAsFactors=FALSE)
                    drought=pdsi24.z,
                    precip=ppt.mat)
 
-#JAGS model: covariates, no random effects
+#JAGS model: covariates (except survey effort), no random effects
   sink("CJS_Covars_NoREs.txt")
   cat("
     model{
@@ -322,7 +318,7 @@ disttocity <- read.csv('PlotDistToCity.csv',header=TRUE,stringsAsFactors=FALSE)
       b.int ~ dnorm(0,0.1)
       alpha.p0 ~ dlogis(0,1)
       a.male ~ dnorm(0,0.1)
-      a.precip ~ dnorm(0,0.1)      
+      a.precip ~ dnorm(0,0.1)
       psi ~ dunif(0,1)
   
       #-- Likelihood
@@ -358,10 +354,11 @@ disttocity <- read.csv('PlotDistToCity.csv',header=TRUE,stringsAsFactors=FALSE)
   
 #MCMC settings, parameters, initial values  
   #ni <- 2000; na <- 1000; nb <- 8000; nc <- 3; ni.tot <- ni + nb
-	ni <- 500; na <- 500; nb <- 500; nc <- 3; ni.tot <- ni + nb
+	ni <- 50; na <- 100; nb <- 50; nc <- 3; ni.tot <- ni + nb
   
 	params <- c('beta.phi0','b.male','b.distance','b.mnprecip','b.drought','b.int',
-	            'alpha.p0','a.male','a.precip','psi','phi0.female','phi0.male','p0.female','p0.male')
+	            'alpha.p0','a.male','a.precip',
+	            'psi','phi0.female','phi0.male','p0.female','p0.male')
   
   inits <- function() {list(beta.phi0=runif(1,0,3),
                             b.male=runif(1,-1,1),
@@ -498,4 +495,182 @@ disttocity <- read.csv('PlotDistToCity.csv',header=TRUE,stringsAsFactors=FALSE)
                    parallel=T, n.cores=3, DIC=FALSE)  
 	print(fit.cjs2)
 
+#-----------------------------------------------------------------------------------------------# 
+# Run CJS model in JAGS with fixed effects (including survey effort) and a random site effect in survival model
+#-----------------------------------------------------------------------------------------------# 
+#In order to include effort as a covariate, we'll need to convert the observation part of the model into
+#long form (because we don't have effort measures when a plot wasn't surveyed)
+
+#Convert capture-recapture dataframe to long form
+	crl <- melt(cr,id.vars=c('plot','tort','sex'),value.name='obs',variable.name='yr')
+	crl$yr <- as.numeric(substr(crl$yr,2,5))
+  #Remove NAs (when plots weren't surveyed, so it wasn't possible to capture the tortoise)
+	crl <- crl[!is.na(crl$obs),]
+	#Only retain survey years after first capture of each individual 
+	#note: this will remove individuals only captured in last survey year (that don't contribute to survival estimates)
+	crl <- crl[with(crl,order(tort,yr)),]
+	firstyr <- ddply(crl,.(tort),summarize,firstyr=min(yr[obs==1]))
+	crl$firstyr <- firstyr$firstyr[match(crl$tort,firstyr$tort)]
+	obs.after1 <- crl[crl$yr>crl$firstyr,]
+	#Create male indicator
+	obs.after1$sex[obs.after1$sex==3] <- NA
+	obs.after1$male <- obs.after1$sex-1
+  #Attach annual precipitation values
+	names(precip.aj)[names(precip.aj)=='season'] <- 'yr'
+	obs.after1 <- join(obs.after1,precip.aj[,c('plot','yr','ppt.z')],by=c('plot','yr'),type='left')
 	
+#Formatting survey-level covariate: effort
+	#Could just use person days as a measure of effort
+	#Alternatively, could use days/plot area since a few plots are considerably smaller than the rest (effort.sc)
+	surv.l$area.sqkm <- surv.l$area.sqmi*2.59
+	surv.l$effort.sc <- surv.l$persondays/surv.l$area.sqkm
+	#Standardize values
+	surv.l$effort.z <- (surv.l$persondays - mean(surv.l$persondays))/sd(surv.l$persondays)
+	surv.l$effort.sc.z <- (surv.l$effort.sc - mean(surv.l$effort.sc))/sd(surv.l$effort.sc)
+	surv.l <- surv.l[order(surv.l$code),]
+	#Attach effort covariates to observations dataframe (obs.after1)
+	effort <- surv.l[,c('code','yr','persondays','area.sqkm','effort.sc','effort.z','effort.sc.z')]
+	names(effort)[1] <- 'plot'
+	obs.after1 <- join(obs.after1,effort[,c('plot','yr','effort.z','effort.sc.z')],by=c('plot','yr'),type='left')
+	
+#Create tortoise, plot indices
+	torts <- unique(obs.after1[,c('plot','tort','male','firstyr')])
+	torts$tort.index <- 1:nrow(torts)
+	plots <- data.frame(plot=unique(obs.after1$plot),plot.index=1:length(unique(obs.after1$plot)))
+  torts$plot.index <- plots$plot.index[match(torts$plot,plots$plot)]
+  obs.after1$tort.index <- torts$tort.index[match(obs.after1$tort,torts$tort)]
+  obs.after1$recapyr <- obs.after1$yr-1988+1
+
+#Prep data objects for JAGS
+  ntorts <- nrow(torts)          #number of tortoises (excludes those only captured during last survey year)
+  nyears <- length(1987:2020)    #number of occasions
+  nplots <- nrow(plots)          #number of plots
+  nobs <- nrow(obs.after1)       #number of capture-recapture observations (all surveys after first capture)
+  first <- torts$firstyr-1987+1  #index for year each tortoise was first captured
+  
+  tortdata <- list(y=obs.after1$obs,
+                   ntorts=ntorts,
+                   nyears=nyears,
+                   nplots=nplots,
+                   nobs=nobs,
+                   first=first,
+                   male=torts$male,
+                   plot=torts$plot.index,
+                   distance=distance,
+                   mean.precip=precip.norm,
+                   drought=pdsi24.z,
+                   male.long=obs.after1$male,
+                   precip.long=obs.after1$ppt.z,
+                   effort.long=obs.after1$effort.sc.z,
+                   tort=obs.after1$tort.index,
+                   recapyr=obs.after1$recapyr)
+
+#JAGS model:	
+  sink("CJS_CovarsWithEffort_siteREs.txt")
+  cat("
+    model{
+      
+      #-- Priors
+
+      beta.phi0 ~ dlogis(0,1)
+      b.male ~ dnorm(0,0.1)
+      b.distance ~ dnorm(0,0.1)
+      b.mnprecip ~ dnorm(0,0.1)
+      b.drought ~ dnorm(0,0.1)
+      b.int ~ dnorm(0,0.1)
+      alpha.p0 ~ dlogis(0,1)
+      a.male ~ dnorm(0,0.1)
+      a.precip ~ dnorm(0,0.1) 
+      a.effort ~ dnorm(0,0.1)
+      psi ~ dunif(0,1)
+      
+      sigma.site ~ dt(0,pow(2.5,-2),1)T(0,)  #Half-cauchy prior
+      tau.site <- 1/(sigma.site*sigma.site)
+
+      for(p in 1:nplots){
+        e.site[p] ~ dnorm(0,tau.site)
+      } #p
+
+      #-- State process
+      
+      for (i in 1:ntorts){
+        
+        z[i,first[i]] <- 1
+        male[i] ~ dbern(psi)
+      
+        for(t in (first[i]+1):nyears){
+          
+          #Survival probabilities from t-1 to t (indexed 1:33)
+          logit(phi[i,t-1]) <- beta.phi0 + b.male*male[i] + b.distance*distance[plot[i]] + 
+                               b.mnprecip*mean.precip[plot[i]] + b.drought*drought[plot[i],t-1] + 
+                               b.int*mean.precip[plot[i]]*drought[plot[i],t-1] + e.site[plot[i]]
+
+          p_alive[i,t] <- phi[i,t-1]*z[i,t-1]
+          z[i,t] ~ dbern(p_alive[i,t])
+        
+        } #t
+      } #i   
+
+
+      #-- Observation process
+      
+      for (w in 1:nobs){
+
+        male.long[w] ~ dbern(psi)
+
+        #Recapture probabilities 
+        logit(p[w]) <- alpha.p0 + a.male*male.long[w] + a.precip*precip.long[w] + a.effort*effort.long[w]
+          
+        p_obs[w] <- p[w]*z[tort[w],recapyr[w]]
+        y[w] ~ dbern(p_obs[w])
+ 
+      } #w
+          
+      #-- Derived parameters
+      
+      logit(phi0.female) <- beta.phi0
+      logit(p0.female) <- alpha.p0
+      phi0.male <- exp(beta.phi0 + b.male)/(1 + exp(beta.phi0 + b.male))
+      p0.male <- exp(alpha.p0 + a.male)/(1 + exp(alpha.p0 + a.male))
+      
+
+    } #model
+  ",fill=TRUE)
+  sink()
+
+#MCMC settings, parameters, initial values  
+  #ni <- 20000; na <- 2000; nb <- 20000; nt <- 20; nc <- 3; ni.tot <- ni + nb
+	ni <- 50; na <- 500; nb <- 50; nc <- 3; ni.tot <- ni + nb
+  
+	params <- c('beta.phi0','b.male','b.distance','b.mnprecip','b.drought','b.int',
+	            'alpha.p0','a.male','a.precip','a.effort',
+	            'psi','sigma.site','e.site',
+	            'phi0.female','phi0.male','p0.female','p0.male')
+	
+	zinits <- cr[cr$tort %in% torts$tort,]
+	zinits$tort.index <- torts$tort.index[match(zinits$tort,torts$tort)]
+	zinits <- zinits[with(zinits,order(tort.index)),]
+	zinits.mat <- as.matrix(zinits[,grep('y',colnames(zinits))]) 
+	
+  inits <- function() {list(beta.phi0=runif(1,1,3),
+                            b.male=runif(1,-0.5,0.5),
+                            b.distance=runif(1,-1,1),
+                            b.mnprecip=runif(1,-0.5,0.5),
+                            b.drought=runif(1,-0.5,0.5),
+                            b.int=runif(1,-0.5,0.5),
+                            alpha.p0=runif(1,0,2),
+                            a.male=runif(1,-0.5,0.5),
+                            a.precip=runif(1,-0.5,0.5),
+                            a.effort=runif(1,-0.5,0.5),
+                            psi=dunif(1,0,1),
+                            sigma.site=dunif(1,0,3),
+                            male=ifelse(is.na(torts$male),1,NA),
+                            male.long=ifelse(is.na(obs.after1$male),1,NA),
+                            z=ch.init(zinits.mat,first))}
+
+#Run model
+	fit.cjs3 <- jags(data=tortdata, inits=inits, parameters.to.save=params,
+                   model.file='CJS_CovarsWithEffort_siteREs.txt',
+                   n.chains=nc, n.adapt=na, n.iter=ni.tot, n.burnin=nb,
+                   parallel=T, n.cores=3, DIC=FALSE)  
+	print(fit.cjs3)	

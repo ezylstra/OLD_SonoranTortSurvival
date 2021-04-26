@@ -1,0 +1,69 @@
+
+    model{
+      
+      #-- Priors
+
+      beta.phi0 ~ dlogis(0,1)
+      b.male ~ dnorm(0,0.1)
+      b.distance ~ dnorm(0,0.1)
+      b.mnprecip ~ dnorm(0,0.1)
+      b.drought ~ dnorm(0,0.1)
+      b.int ~ dnorm(0,0.1)
+      alpha.p0 ~ dlogis(0,1)
+      a.male ~ dnorm(0,0.1)
+      a.precip ~ dnorm(0,0.1) 
+      a.effort ~ dnorm(0,0.1)
+      psi ~ dunif(0,1)
+      
+      sigma.site ~ dt(0,pow(2.5,-2),1)T(0,)  #Half-cauchy prior
+      tau.site <- 1/(sigma.site*sigma.site)
+
+      for(p in 1:nplots){
+        e.site[p] ~ dnorm(0,tau.site)
+      } #p
+
+      #-- State process
+      
+      for (i in 1:ntorts){
+        
+        z[i,first[i]] <- 1
+        male[i] ~ dbern(psi)
+      
+        for(t in (first[i]+1):nyears){
+          
+          #Survival probabilities from t-1 to t (indexed 1:33)
+          logit(phi[i,t-1]) <- beta.phi0 + b.male*male[i] + b.distance*distance[plot[i]] + 
+                               b.mnprecip*mean.precip[plot[i]] + b.drought*drought[plot[i],t-1] + 
+                               b.int*mean.precip[plot[i]]*drought[plot[i],t-1] + e.site[plot[i]]
+
+          p_alive[i,t] <- phi[i,t-1]*z[i,t-1]
+          z[i,t] ~ dbern(p_alive[i,t])
+        
+        } #t
+      } #i   
+
+
+      #-- Observation process
+      
+      for (w in 1:nobs){
+
+        male.long[w] ~ dbern(psi)
+
+        #Recapture probabilities 
+        logit(p[w]) <- alpha.p0 + a.male*male.long[w] + a.precip*precip.long[w] + a.effort*effort.long[w]
+          
+        p_obs[w] <- p[w]*z[tort[w],recapyr[w]]
+        y[w] ~ dbern(p_obs[w])
+ 
+      } #w
+          
+      #-- Derived parameters
+      
+      logit(phi0.female) <- beta.phi0
+      logit(p0.female) <- alpha.p0
+      phi0.male <- exp(beta.phi0 + b.male)/(1 + exp(beta.phi0 + b.male))
+      p0.male <- exp(alpha.p0 + a.male)/(1 + exp(alpha.p0 + a.male))
+      
+
+    } #model
+  
