@@ -281,6 +281,32 @@ disttocity <- read.csv('PlotDistToCity.csv',header=TRUE,stringsAsFactors=FALSE)
 	ppt.df <- dcast(precip.aj,plot~season,value.var='ppt.z')
 	ppt.mat <- as.matrix(ppt.df[,2:ncol(ppt.df)])
 	
+#Formatting site*year covariate: survey effort (person days or person days scaled by plot area in sqkm)
+	surv.l$area.sqkm <- surv.l$area.sqmi*2.59
+	surv.l$effort.sc <- surv.l$persondays/surv.l$area.sqkm
+	#Standarize values
+	surv.l$effort.z <- (surv.l$persondays - mean(surv.l$persondays))/sd(surv.l$persondays)
+	surv.l$effort.sc.z <- (surv.l$effort.sc - mean(surv.l$effort.sc))/sd(surv.l$effort.sc)
+	surv.l$plot <- NULL
+	names(surv.l)[names(surv.l)=='code'] <- 'plot'
+	surv.l <- surv.l[order(surv.l$code),]	
+	#Put into wide form (plot ~ yr)
+	eff <- dcast(surv.l, plot ~ yr, value.var='effort.z')
+	names(eff)[2:ncol(eff)] <- paste0('y',names(eff[,2:ncol(eff)]))
+	effsc <- dcast(surv.l, plot ~ yr, value.var='effort.sc.z')
+	names(effsc)[2:ncol(effsc)] <- paste0('y',names(effsc[,2:ncol(effsc)]))
+  #Add columns for years when no plots were surveyed (1989, 2009, 2011-2014)
+  eff <- cbind(eff,data.frame(y1989=rep(NA,nrow(eff)),y2009=NA,y2011=NA,y2012=NA,y2013=NA,y2014=NA))
+  eff <- eff[,order(names(eff))]
+  effsc <- cbind(effsc,data.frame(y1989=rep(NA,nrow(eff)),y2009=NA,y2011=NA,y2012=NA,y2013=NA,y2014=NA))
+	effsc <- effsc[,order(names(effsc))]
+	#Convert from dataframe to matrix and replace all NAs with 0s
+	#Don't need 1987 data, so removing
+	eff <- as.matrix(eff[,3:ncol(eff)])
+	eff[is.na(eff)] <- 0
+	effsc <- as.matrix(effsc[,3:ncol(effsc)])
+	effsc[is.na(effsc)] <- 0
+	
 #Plot index for each tortoise
 	plots <- data.frame(plot=unique(cr$plot),plot.index=1:length(unique(cr$plot)))
   plot.index <- plots$plot.index[match(cr$plot,plots$plot)]	
@@ -297,7 +323,7 @@ disttocity <- read.csv('PlotDistToCity.csv',header=TRUE,stringsAsFactors=FALSE)
                    drought=pdsi24.z,
                    precip=ppt.mat)
 
-#JAGS model: covariates, no random effects
+#JAGS model: covariates (without effort), no random effects
   sink("CJS_Covars_NoREs.txt")
   cat("
     model{
@@ -497,5 +523,3 @@ disttocity <- read.csv('PlotDistToCity.csv',header=TRUE,stringsAsFactors=FALSE)
                    n.chains=nc, n.adapt=na, n.iter=ni.tot, n.burnin=nb,
                    parallel=T, n.cores=3, DIC=FALSE)  
 	print(fit.cjs2)
-
-	
