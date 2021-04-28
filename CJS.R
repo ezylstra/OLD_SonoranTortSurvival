@@ -289,7 +289,7 @@ disttocity <- read.csv('PlotDistToCity.csv',header=TRUE,stringsAsFactors=FALSE)
 	surv.l$effort.sc.z <- (surv.l$effort.sc - mean(surv.l$effort.sc))/sd(surv.l$effort.sc)
 	surv.l$plot <- NULL
 	names(surv.l)[names(surv.l)=='code'] <- 'plot'
-	surv.l <- surv.l[order(surv.l$code),]	
+	surv.l <- surv.l[order(surv.l$plot),]	
 	#Put into wide form (plot ~ yr)
 	eff <- dcast(surv.l, plot ~ yr, value.var='effort.z')
 	names(eff)[2:ncol(eff)] <- paste0('y',names(eff[,2:ncol(eff)]))
