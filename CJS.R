@@ -523,3 +523,121 @@ disttocity <- read.csv('PlotDistToCity.csv',header=TRUE,stringsAsFactors=FALSE)
                    n.chains=nc, n.adapt=na, n.iter=ni.tot, n.burnin=nb,
                    parallel=T, n.cores=3, DIC=FALSE)  
 	print(fit.cjs2)
+
+#-----------------------------------------------------------------------------------------------# 
+# Run CJS model in JAGS with fixed effects, including effort, and a random site effect in survival model
+#-----------------------------------------------------------------------------------------------# 
+#Prep data objects for JAGS
+  ntorts <- nrow(cr.mat)             #number of tortoises
+  nyears <- ncol(cr.mat)             #number of occasions
+  nplots <- length(unique(cr$plot))  #number of plots
+  
+  tortdata <- list(y=as.matrix(cr.mat),
+                   ntorts=ntorts,
+                   nyears=nyears,
+                   nplots=nplots,
+                   first=first,
+                   male=male.ind,
+                   plot=plot.index,
+                   distance=distance,
+                   mean.precip=precip.norm,
+                   drought=pdsi24.z,
+                   precip=ppt.mat,
+                   effort=eff)
+
+#JAGS model: covariates (including effort), site random effects	
+  sink("CJS_CovarsWithEffort_siteREs.txt")
+  cat("
+    model{
+      
+      #-- Priors and constraints
+      
+      for (i in 1:ntorts){
+        for(t in first[i]:(nyears-1)){
+        
+          logit(phi[i,t]) <- beta.phi0 + b.male*male[i] + b.distance*distance[plot[i]] + b.mnprecip*mean.precip[plot[i]] + 
+                             b.drought*drought[plot[i],t] + b.int*mean.precip[plot[i]]*drought[plot[i],t] + e.site[plot[i]]
+          logit(p[i,t]) <- alpha.p0 + a.male*male[i] + a.precip*precip[plot[i],t] + a.effort*effort[plot[i],t]
+
+        } #t
+      }#i   
+      
+      for(p in 1:nplots){
+        e.site[p] ~ dnorm(0,tau.site)
+      }
+      
+      beta.phi0 ~ dlogis(0,1)
+      b.male ~ dnorm(0,0.1)
+      b.distance ~ dnorm(0,0.1)
+      b.mnprecip ~ dnorm(0,0.1)
+      b.drought ~ dnorm(0,0.1)
+      b.int ~ dnorm(0,0.1)
+      alpha.p0 ~ dlogis(0,1)
+      a.male ~ dnorm(0,0.1)
+      a.precip ~ dnorm(0,0.1)
+      a.effort ~ dnorm(0,0.1)
+      psi ~ dunif(0,1)
+      
+      sigma.site ~ dt(0,pow(2.5,-2),1)T(0,)  #Half-cauchy prior
+      tau.site <- 1/(sigma.site*sigma.site)
+
+      #-- Likelihood
+      
+      for(i in 1:ntorts){
+        z[i,first[i]] <- 1
+        male[i] ~ dbern(psi)
+        
+        for (t in (first[i]+1):nyears){              
+        
+          #State process
+          z[i,t] ~ dbern(p_alive[i,t])
+          p_alive[i,t] <- phi[i,t-1]*z[i,t-1]
+          
+          #Observation process
+          y[i,t] ~ dbern(p_obs[i,t])
+          p_obs[i,t] <- p[i,t-1]*z[i,t]               
+          
+        } #t
+      } #i
+
+      #-- Derived parameters
+      
+      logit(phi0.female) <- beta.phi0
+      logit(p0.female) <- alpha.p0
+      phi0.male <- exp(beta.phi0 + b.male)/(1 + exp(beta.phi0 + b.male))
+      p0.male <- exp(alpha.p0 + a.male)/(1 + exp(alpha.p0 + a.male))
+      
+
+    } #model
+  ",fill=TRUE)
+  sink()
+
+#MCMC settings, parameters, initial values  
+  #ni <- 20000; na <- 2000; nb <- 20000; nt <- 20; nc <- 3; ni.tot <- ni + nb
+	ni <- 500; na <- 500; nb <- 500; nc <- 3; nt <- 1; ni.tot <- ni + nb
+  
+	params <- c('beta.phi0','b.male','b.distance','b.mnprecip','b.drought','b.int',
+	            'alpha.p0','a.male','a.precip','a.effort','psi','sigma.site','e.site',
+	            'phi0.female','phi0.male','p0.female','p0.male')
+  
+  inits <- function() {list(beta.phi0=runif(1,1,3),
+                            b.male=runif(1,-0.5,0.5),
+                            b.distance=runif(1,-1,1),
+                            b.mnprecip=runif(1,-0.5,0.5),
+                            b.drought=runif(1,-0.5,0.5),
+                            b.int=runif(1,-0.5,0.5),
+                            alpha.p0=runif(1,0,2),
+                            a.male=runif(1,-0.5,0.5),
+                            a.precip=runif(1,-0.5,0.5),
+                            a.effort=runif(1,-0.5,0.5),
+                            psi=dunif(1,0,1),
+                            sigma.site=dunif(1,0,3),
+                            male=ifelse(is.na(male.ind),1,NA),
+                            z=ch.init(as.matrix(cr.mat),first))}
+
+#Run model
+	fit.cjs3 <- jags(data=tortdata, inits=inits, parameters.to.save=params,
+                   model.file='CJS_CovarsWithEffort_siteREs.txt',
+                   n.chains=nc, n.adapt=na, n.iter=ni.tot, n.burnin=nb, n.thin=nt,
+                   parallel=T, n.cores=3, DIC=FALSE)  
+	print(fit.cjs3)
