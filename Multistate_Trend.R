@@ -658,7 +658,39 @@ disttocity <- read.csv('PlotDistToCity.csv',header=TRUE,stringsAsFactors=FALSE)
 #-----------------------------------------------------------------------------------------------# 
 # Post-processing: plot-specific estimates
 #-----------------------------------------------------------------------------------------------#	
-	
-	
-	
+
+#Adult survival
+  #Generating values for 2004-2005 (yr.trend = 17), with drought = 0
+  phi2p <- phi2.s[,c('beta.phi2','b2.male','b2.distance','b2.mnprecip','b2.trend')]
+
+  predpx <- cbind(int=1,male=rep(0:1,each=17),distance=rep(distance,2),mnprecip=rep(precip.norm,2),trend=17)
+  predpl <- predpx %*% t(phi2p)
+  RE.mat <- rbind(t(phi2RE.s),t(phi2RE.s))
+  predpl <- predpl + RE.mat
+  predp <- exp(predpl)/(1+exp(predpl)) 	
+  
+  plotests <- data.frame(plot=disttocity$plot)
+  plotests$ad.fem <- round(apply(predp[1:17,],1,ctend),2)
+  #plotests$ad.fem.lcl <- apply(predp[1:17,],1,quantile,probs=0.05)
+  #plotests$ad.fem.ucl <- apply(predp[1:17,],1,quantile,probs=0.95)
+  plotests$ad.male <- round(apply(predp[18:34,],1,ctend),2)
+  #plotests$ad.male.lcl <- apply(predp[18:34,],1,quantile,probs=0.05)
+  #plotests$ad.male.ucl <- apply(predp[18:34,],1,quantile,probs=0.95)
+
+#Juvenile survival
+  phi1p <- phi1.s[,c('beta.phi1','b1.distance','b1.mnprecip')]
+  predp1x <- cbind(int=1,distance=distance,mnprecip=precip.norm))
+  predp1l <- predp1x %*% t(phi1p)
+  predp1 <- exp(predp1l)/(1+exp(predp1l)) 
+  plotests$juv <- round(apply(predp1,1,ctend),2)
+  
+#Transition rates
+  predpsix <- cbind(int=1,mnprecip=precip.norm)
+  predpsil <- predpsix %*% t(psi12.s)
+  predpsi <- exp(predpsil)/(1+exp(predpsil))
+  plotests$transition <- round(apply(predpsi,1,ctend),2)
+  
+  plotests
+  
+  
 	
