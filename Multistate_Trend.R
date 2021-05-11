@@ -682,7 +682,7 @@ disttocity <- read.csv('PlotDistToCity.csv',header=TRUE,stringsAsFactors=FALSE)
 
 #Juvenile survival
   phi1p <- phi1.s[,c('beta.phi1','b1.distance','b1.mnprecip')]
-  predp1x <- cbind(int=1,distance=distance,mnprecip=precip.norm))
+  predp1x <- cbind(int=1,distance=distance,mnprecip=precip.norm)
   predp1l <- predp1x %*% t(phi1p)
   predp1 <- exp(predp1l)/(1+exp(predp1l)) 
   plotests$juv <- round(apply(predp1,1,ctend),2)
@@ -695,5 +695,7 @@ disttocity <- read.csv('PlotDistToCity.csv',header=TRUE,stringsAsFactors=FALSE)
   
   plotests
   
-  
+#-----------------------------------------------------------------------------------------------# 
+# Post-processing: population growth rates
+#-----------------------------------------------------------------------------------------------#	 
 	
