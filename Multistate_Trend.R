@@ -85,6 +85,9 @@ disttocity <- read.csv('PlotDistToCity.csv',header=TRUE,stringsAsFactors=FALSE)
   
   #Dataframe with number of tortoises caught at least once in each year a plot was surveyed
   plotyr <- ddply(datyr,.(plot,yr),summarize,ntorts=length(tort))
+  
+  #Dataframe with number of tortoises caught ever at each plot
+  plottort <- ddply(datyr,.(plot),summarize,ntorts=length(unique(tort)))
 
 #Create matrix with capture histories 
 #1=captured as juvenile; 2=captured as adult; 3=plot surveyed but tortoise not captured; NA=plot not surveyed)  
