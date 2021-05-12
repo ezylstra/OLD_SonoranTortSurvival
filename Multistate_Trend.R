@@ -457,11 +457,11 @@ disttocity <- read.csv('PlotDistToCity.csv',header=TRUE,stringsAsFactors=FALSE)
 #-----------------------------------------------------------------------------------------------#	
 
 #For all figures, decide whether to use mean or median for measure of central tendency
-  #ctend <- mean
-  ctend <- median
+  ctend <- mean
+  #ctend <- median
 #And which quantiles for credible intervals
-  qprobs <- c(0.05,0.95)   #90% CIs
-  #qprobs <- c(0.025,0.975) #95% CIs
+  #qprobs <- c(0.05,0.95)   #90% CIs
+  qprobs <- c(0.025,0.975) #95% CIs
 
 #Marginal effects of covariates on adult survival: mean precipitation and drought
   #Use survival estimates for middle interval (2003-2004; yr.trend=16)
@@ -538,7 +538,7 @@ disttocity <- read.csv('PlotDistToCity.csv',header=TRUE,stringsAsFactors=FALSE)
     lines(mean.m.avg~plotx,type='l',lty=1,col=col2)
     polygon(c(plotx,rev(plotx)),c(ci.m.avg[1,],rev(ci.m.avg[2,])),col=col2p,border=NA)  
     arrows(x0=0,x1=0,y0=0.68,y1=1,length=0,col='gray50')
-    mtext('Adult survival (90% CI)',side=2,las=0,line=2.1,cex=0.8)
+    mtext('Adult survival (95% CI)',side=2,las=0,line=2.1,cex=0.8)
     mtext('PDSI (24-month)',side=1,line=1.5,cex=0.8)
     legend('bottomright',c('Female','Male'),lty=1,col=c(col1,col2),bty='n')
   #dev.off()  
@@ -591,7 +591,7 @@ disttocity <- read.csv('PlotDistToCity.csv',header=TRUE,stringsAsFactors=FALSE)
          tcl=-0.25,las=1,mgp=c(1.5,0.5,0))
     polygon(c(plotx,rev(plotx)),c(ci.j.avg[1,],rev(ci.j.avg[2,])),col=rgb(0,0,0,0.2),border=NA)  
     arrows(x0=0,x1=0,y0=0.45,y1=1,length=0,col='gray50')
-    mtext('Juvenile survival (90% CI)',side=2,las=0,line=2.1,cex=0.8)
+    mtext('Juvenile survival (95% CI)',side=2,las=0,line=2.1,cex=0.8)
     mtext('PDSI (24-month)',side=1,line=1.5,cex=0.8)
   #dev.off()  	
     
@@ -674,11 +674,11 @@ disttocity <- read.csv('PlotDistToCity.csv',header=TRUE,stringsAsFactors=FALSE)
   
   plotests <- data.frame(plot=disttocity$plot)
   plotests$ad.fem <- round(apply(predp[1:17,],1,ctend),2)
-  #plotests$ad.fem.lcl <- apply(predp[1:17,],1,quantile,probs=0.05)
-  #plotests$ad.fem.ucl <- apply(predp[1:17,],1,quantile,probs=0.95)
+  # plotests$ad.fem.lcl <- apply(predp[1:17,],1,quantile,probs=0.025)
+  # plotests$ad.fem.ucl <- apply(predp[1:17,],1,quantile,probs=0.975)
   plotests$ad.male <- round(apply(predp[18:34,],1,ctend),2)
-  #plotests$ad.male.lcl <- apply(predp[18:34,],1,quantile,probs=0.05)
-  #plotests$ad.male.ucl <- apply(predp[18:34,],1,quantile,probs=0.95)
+  # plotests$ad.male.lcl <- apply(predp[18:34,],1,quantile,probs=0.025)
+  # plotests$ad.male.ucl <- apply(predp[18:34,],1,quantile,probs=0.975)
 
 #Juvenile survival
   phi1p <- phi1.s[,c('beta.phi1','b1.distance','b1.mnprecip')]
@@ -698,4 +698,68 @@ disttocity <- read.csv('PlotDistToCity.csv',header=TRUE,stringsAsFactors=FALSE)
 #-----------------------------------------------------------------------------------------------# 
 # Post-processing: population growth rates
 #-----------------------------------------------------------------------------------------------#	 
-	
+
+#Gather plot-specific covariate values (standardized)
+  plotcovs <- data.frame(plot=disttocity$plot,dist.z=distance,mnprecip.z=precip.norm)
+  #For each plot, using 3 drought values (-3, 0, +3)
+  phi.Xdf <- plotcovs[rep(seq_len(nrow(plotcovs)),each=3),] 
+  drought3 <- rep(c(-3,0,3),nrow(plotcovs))
+  phi.Xdf$drought.z <- (drought3 - pdsi24.mn)/pdsi24.sd
+  phi.Xdf$int.z <- phi2.Xdf$mnprecip.z*phi2.Xdf$drought.z
+  
+  #Create a matrix of covariate values for juvenile survival  
+  phi1.X <- as.matrix(phi.Xdf[,c('dist.z','mnprecip.z','drought.z','int.z')])
+  phi1.X <- cbind(rep(1,nrow(phi1.X)),phi1.X)  
+  
+  #Create a matrix of covariate values for adult survival 
+  #Last column is for the trend effect (17 = 2004-2005 estimates)
+  phi2.X <- as.matrix(phi.Xdf[,c('dist.z','mnprecip.z','drought.z','int.z')])
+  phi2.X <- cbind(rep(1,nrow(phi2.X)),phi2.X,rep(17,nrow(phi2.X)))
+
+  #Create a matrix of covariate values for transition rate  
+  psi12.X <- as.matrix(phi.Xdf[,'mnprecip.z'])
+  psi12.X <- cbind(rep(1,nrow(psi12.X)),psi12.X)    
+
+#Calculate survival, transition estimates for each combination of covariates, iteration
+  
+  #Juvenile survival
+  lphi1 <- phi1.X %*% t(phi1.s)
+  phi1 <- exp(lphi1)/(1+exp(lphi1))
+  
+  #Adult survival (need to add in random site effects)
+  phi2.s.female <- phi2.s[,colnames(phi2.s)!='b2.male']
+  lphi2 <- phi2.X %*% t(phi2.s.female)
+  REs <- t(phi2RE.s)
+  REs <- REs[rep(seq_len(nrow(REs)),each=3),]
+  lphi2RE <- lphi2 + REs
+  phi2 <- exp(lphi2RE)/(1+exp(lphi2RE))	
+  
+  #Transition rates
+  lpsi12 <- psi12.X %*% t(psi12.s)
+  psi12 <- exp(lpsi12)/(1+exp(lpsi12))
+ 
+#Create population projection matrices, and estimate lambda values
+#Assuming recruitment = 0.32 f/f/yr 
+  
+  lambda <- matrix(NA,nrow=nrow(phi2),ncol=niter)
+  
+  for(i in 1:nrow(phi2)){ 
+    for (j in 1:niter){
+      proj.mat <- matrix(c(phi1[i,j]*(1-psi12[j]), 0.32,
+                           phi1[i,j]*psi12[j], phi2[i,j]),
+                         nrow=2,ncol=2,byrow=TRUE)
+      lambda[i,j] <- eigen(proj.mat)$values[1]
+    }
+  } 
+  
+#Summarize distributions of lambda values for each plot-drought combination
+  lambda.df <- data.frame(plot=phi.Xdf$plot,drought=drought3)
+  lambda.df$mn <- apply(lambda,1,mean)
+  lambda.df$q0.025 <- apply(lambda,1,quantile,0.025)
+  lambda.df$q0.05 <- apply(lambda,1,quantile,0.05)
+  lambda.df$q0.5 <- apply(lambda,1,quantile,0.5)
+  lambda.df$q0.95 <- apply(lambda,1,quantile,0.95)
+  lambda.df$q0.975 <- apply(lambda,1,quantile,0.975)
+  (lambda.df <- lambda.df[with(lambda.df,order(drought,plot)),])
+  #write.table(lambda.df,'clipboard',sep='\t',row.names=FALSE,col.names=TRUE)
+  
