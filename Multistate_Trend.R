@@ -35,6 +35,14 @@ disttocity <- read.csv('PlotDistToCity.csv',header=TRUE,stringsAsFactors=FALSE)
 #Change name of Four Peaks plot to match that in live tortoise database:
   surv.l$plot[surv.l$plot=='FS Four Peaks'] <- 'Four Peaks'
   
+#Number of years between consecutive surveys
+  surv.l <- surv.l[with(surv.l,order(code,yr)),]
+  surv.l$interval <- NA
+  for(i in 2:nrow(surv.l)){
+    surv.l$interval[i] <- ifelse(surv.l$code[i]!=surv.l$code[i-1],NA,surv.l$yr[i]-surv.l$yr[i-1])
+  }
+  # summary(surv.l$interval)
+  
 #Create a wide version of the survey data table, with 1/0 indicating when surveys were done
   surv.w <- dcast(surv.l, plot + code + area.sqmi ~ yr, value.var='persondays')
   surv.w.mat <- surv.w[,4:ncol(surv.w)]
