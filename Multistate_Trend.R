@@ -50,6 +50,13 @@ disttocity <- read.csv('PlotDistToCity.csv',header=TRUE,stringsAsFactors=FALSE)
   surv.p <- ddply(surv.l,.(plot,code),summarize,area.sqmi=mean(area.sqmi),n.surveys=sum(!is.na(persondays)),
                   first.surv=min(yr[!is.na(persondays)]),last.surv=max(yr[!is.na(persondays)]))
 
+#Summarizing survey effort by year
+  surv.y <- ddply(surv.l,.(yr),summarize,nplots=length(plot),eff.per.survey=sum(persondays)/length(persondays))
+  surv.y <- rbind(surv.y,data.frame(yr=c(1989,2009,2011:2014),nplots=0,eff.per.survey=NA))
+  surv.y <- surv.y[order(surv.y$yr),]
+  surv.y$period <- ifelse(surv.y$yr %in% 1987:2008,'1','2')
+  # ddply(surv.y,.(period),summarize,nplots.mn=mean(nplots), nplots.md=median(nplots),persondays.mn=mean(eff.per.survey,na.rm=T))
+  
 #-----------------------------------------------------------------------------------------------# 
 # Create capture histories for each individual
 #-----------------------------------------------------------------------------------------------# 
