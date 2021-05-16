@@ -478,7 +478,6 @@ disttocity <- read.csv('PlotDistToCity.csv',header=TRUE,stringsAsFactors=FALSE)
   predx <- cbind(int=1,male=rep(0:1,each=300),mnprecip=rep(rep(mnprecip3.z,2),each=100),
                  drought=rep(seq(xmin,xmax,length=100),6))
   predx <- cbind(predx,interact=predx[,3]*predx[,4],trend=tail(yr.trendz,1),trend2=tail(yr.trend2z,1))
-  #predx <- cbind(predx,interact=predx[,3]*predx[,4],trend=yr.trendz[10],trend2=yr.trend2z[10])
   predl <- predx %*% t(phi2)  #[600*7] %*% [7*3000] = [600*3000]
   pred <- exp(predl)/(1+exp(predl))  
   #Calculate mean/median and CRIs:  
@@ -721,10 +720,11 @@ disttocity <- read.csv('PlotDistToCity.csv',header=TRUE,stringsAsFactors=FALSE)
 #-----------------------------------------------------------------------------------------------#	
 
 #Adult survival
-  #Generating values for 2004-2005 (yr.trend = 17), with drought = 0
-  phi2p <- phi2.s[,c('beta.phi2','b2.male','b2.distance','b2.mnprecip','b2.trend')]
+  #Generating values for 2019-2020, with drought = 0
+  phi2p <- phi2.s[,c('beta.phi2','b2.male','b2.distance','b2.mnprecip','b2.trend','b2.trend2')]
 
-  predpx <- cbind(int=1,male=rep(0:1,each=17),distance=rep(distance,2),mnprecip=rep(precip.norm,2),trend=17)
+  predpx <- cbind(int=1,male=rep(0:1,each=17),distance=rep(distance,2),mnprecip=rep(precip.norm,2),
+                  trend=tail(yr.trendz,1),trend2=tail(yr.trend2z,1))
   predpl <- predpx %*% t(phi2p)
   RE.mat <- rbind(t(phi2RE.s),t(phi2RE.s))
   predpl <- predpl + RE.mat
@@ -732,11 +732,23 @@ disttocity <- read.csv('PlotDistToCity.csv',header=TRUE,stringsAsFactors=FALSE)
   
   plotests <- data.frame(plot=disttocity$plot)
   plotests$ad.fem <- round(apply(predp[1:17,],1,ctend),2)
-  # plotests$ad.fem.lcl <- apply(predp[1:17,],1,quantile,probs=0.025)
-  # plotests$ad.fem.ucl <- apply(predp[1:17,],1,quantile,probs=0.975)
+  plotests$ad.fem.lcl <- round(apply(predp[1:17,],1,quantile,qprobs[1]),2)
+  plotests$ad.fem.ucl <- round(apply(predp[1:17,],1,quantile,qprobs[2]),2)
   plotests$ad.male <- round(apply(predp[18:34,],1,ctend),2)
-  # plotests$ad.male.lcl <- apply(predp[18:34,],1,quantile,probs=0.025)
-  # plotests$ad.male.ucl <- apply(predp[18:34,],1,quantile,probs=0.975)
+  plotests$ad.male.lcl <- round(apply(predp[18:34,],1,quantile,qprobs[1]),2)
+  plotests$ad.male.ucl <- round(apply(predp[18:34,],1,quantile,qprobs[2]),2)
+  
+  #Adult survival averaged over plots for 2019-2020
+  phi2pA <- phi2.s[,c('beta.phi2','b2.male','b2.trend','b2.trend2')]
+
+  predpxA <- cbind(int=1,male=0:1,trend=tail(yr.trendz,1),trend2=tail(yr.trend2z,1))
+  predplA <- predpxA %*% t(phi2pA)
+  predpA <- exp(predplA)/(1+exp(predplA)) 
+  adsurvivalests <- data.frame(sex=c('F','M'))
+  adsurvivalests$mn <- round(apply(predpA,1,ctend),2)
+  adsurvivalests$lcl <- round(apply(predpA,1,quantile,qprobs[1]),2)
+  adsurvivalests$ucl <- round(apply(predpA,1,quantile,qprobs[2]),2)
+  adsurvivalests
 
 #Juvenile survival
   phi1p <- phi1.s[,c('beta.phi1','b1.distance','b1.mnprecip')]
@@ -744,14 +756,20 @@ disttocity <- read.csv('PlotDistToCity.csv',header=TRUE,stringsAsFactors=FALSE)
   predp1l <- predp1x %*% t(phi1p)
   predp1 <- exp(predp1l)/(1+exp(predp1l)) 
   plotests$juv <- round(apply(predp1,1,ctend),2)
+  plotests$juv.lcl <- round(apply(predp1,1,quantile,qprobs[1]),2)
+  plotests$juv.ucl <- round(apply(predp1,1,quantile,qprobs[2]),2)
   
 #Transition rates
   predpsix <- cbind(int=1,mnprecip=precip.norm)
   predpsil <- predpsix %*% t(psi12.s)
   predpsi <- exp(predpsil)/(1+exp(predpsil))
   plotests$transition <- round(apply(predpsi,1,ctend),2)
+  plotests$transition.lcl <- round(apply(predpsi,1,quantile,qprobs[1]),2)
+  plotests$transition.ucl <- round(apply(predpsi,1,quantile,qprobs[2]),2)
   
   plotests
+  
+
   
 #-----------------------------------------------------------------------------------------------# 
 # Post-processing: population growth rates
