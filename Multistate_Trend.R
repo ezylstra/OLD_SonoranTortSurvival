@@ -263,6 +263,8 @@ disttocity <- read.csv('PlotDistToCity.csv',header=TRUE,stringsAsFactors=FALSE)
   nyears <- ncol(cr.mat)             #number of occasions
   nplots <- length(unique(cr$plot))  #number of plots
   yr.trend <- seq(0,nyears-2)        #sequence to evaluate a (logit) linear trend in adult survival
+  yr.trendz <- (yr.trend - mean(yr.trend))/sd(yr.trend)
+  yr.trend2z <- yr.trendz*yr.trendz
   
   tortdata <- list(y=as.matrix(cr.mat),
                    ntorts=ntorts,
@@ -274,12 +276,13 @@ disttocity <- read.csv('PlotDistToCity.csv',header=TRUE,stringsAsFactors=FALSE)
                    distance=distance,
                    mean.precip=precip.norm,
                    drought=pdsi24.z,
-                   yr.trend=yr.trend,
+                   yr.trend=yr.trendz,
+                   yr.trend2=yr.trend2z,
                    precip=ppt.mat,
                    effort=eff)
 
 #JAGS model
-  # sink("MS_siteREtrend_reducedother.txt")
+  # sink("MS_siteREtrend.txt")
   # cat("
   #   model{
   # 
@@ -307,6 +310,7 @@ disttocity <- read.csv('PlotDistToCity.csv',header=TRUE,stringsAsFactors=FALSE)
   #     b2.drought ~ dnorm(0,0.1)
   #     b2.int ~ dnorm(0,0.1)
   #     b2.trend ~ dnorm(0,0.1)
+  #     b2.trend2 ~ dnorm(0,0.1)
   # 
   #     c.mnprecip ~ dnorm(0,0.1)
   # 
@@ -330,10 +334,9 @@ disttocity <- read.csv('PlotDistToCity.csv',header=TRUE,stringsAsFactors=FALSE)
   #         logit(psi12[i,t]) <- gamma.psi + c.mnprecip*mean.precip[plot[i]]
   # 
   #         logit(p2[i,t]) <- alpha.p2 + a2.male*male[i] + a2.precip*precip[plot[i],t] + a2.effort*effort[plot[i],t]
-  #         logit(phi2[i,t]) <- beta.phi2 + b2.male*male[i] + b2.distance*distance[plot[i]] +
-  #                             b2.mnprecip*mean.precip[plot[i]] + b2.drought*drought[plot[i],t] +
-  #                             b2.int*mean.precip[plot[i]]*drought[plot[i],t] + b2.trend*yr.trend[t] +
-  #                             e.site.2[plot[i]]
+  #         logit(phi2[i,t]) <- beta.phi2 + b2.male*male[i] + b2.distance*distance[plot[i]] + b2.mnprecip*mean.precip[plot[i]] + 
+  #                             b2.drought*drought[plot[i],t] + b2.int*mean.precip[plot[i]]*drought[plot[i],t] + 
+  #                             b2.trend*yr.trend[t] + b2.trend2*yr.trend2[t] + e.site.2[plot[i]]
   # 
   #         #Define state transition probabilities
   #         #First index = states at time t-1, last index = states at time t
@@ -395,13 +398,13 @@ disttocity <- read.csv('PlotDistToCity.csv',header=TRUE,stringsAsFactors=FALSE)
   # sink()
 
 #MCMC settings, parameters, initial values  
-  ni <- 15000; na <- 2000; nb <- 5000; nc <- 3; nt <- 15; ni.tot <- ni + nb
+  ni <- 15000; na <- 2000; nb <- 10000; nc <- 3; nt <- 15; ni.tot <- ni + nb
 
 	params <- c('alpha.p1','a1.precip','a1.effort',
 	            'beta.phi1','b1.distance','b1.mnprecip','b1.drought','b1.int',
 	            'gamma.psi','c.mnprecip',
 	            'alpha.p2','a2.male','a2.precip','a2.effort',
-	            'beta.phi2','b2.male','b2.distance','b2.mnprecip','b2.drought','b2.int','b2.trend',
+	            'beta.phi2','b2.male','b2.distance','b2.mnprecip','b2.drought','b2.int','b2.trend','b2.trend2',
 	            'psi.male','sigma.site.2','e.site.2',
 	            'p1.mn','phi1.mn','psi12.mn',
 	            'phi2.f','phi2.m','p2.f','p2.m')
@@ -426,6 +429,7 @@ disttocity <- read.csv('PlotDistToCity.csv',header=TRUE,stringsAsFactors=FALSE)
                             b2.drought=runif(1,-0.5,0.5),
                             b2.int=runif(1,-0.5,0.5),
                             b2.trend=runif(1,-0.5,0.5),
+                            b2.trend2=runif(1,-0.5,0.5),
                             c.mnprecip=runif(1,-0.5,0.5),
                             psi.male=runif(1,0,1),
                             sigma.site.2=runif(1,0,3),
@@ -435,14 +439,14 @@ disttocity <- read.csv('PlotDistToCity.csv',header=TRUE,stringsAsFactors=FALSE)
 #Run model
   
 	fit.ms <- jags(data=tortdata, inits=inits, parameters.to.save=params,
-                  model.file='MS_siteREtrend_reducedother.txt',
+                  model.file='MS_siteREtrend.txt',
                   n.chains=nc, n.adapt=na, n.iter=ni.tot, n.burnin=nb, n.thin=nt,
                   parallel=T, n.cores=3, DIC=FALSE)
 
 	#load(file.choose())
-	print(fit.ms,digits=3)	
+	print(fit.ms,digits=2)	
 
-  #Create a matrix of posterior samples (use just 1000 of them for now)
+  #Create a matrix of posterior samples
 	out <- fit.ms$samples
   comb <- combine.mcmc(out)
   niter <- 1000
