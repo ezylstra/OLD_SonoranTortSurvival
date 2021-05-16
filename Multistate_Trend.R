@@ -130,6 +130,15 @@ disttocity <- read.csv('PlotDistToCity.csv',header=TRUE,stringsAsFactors=FALSE)
   # crcheck <- crcheck[crcheck$ntorts!=0,]
   # all.equal(crcheck$ntorts,plotyr$ntorts)
   
+  #First and last known state of each tortoise
+  firstlast <- data.frame(cr$tort)
+  firstlast$state1 <- apply(cr[,4:ncol(cr)],1,function(x) head(x[!is.na(x) & x!=3],1))
+  firstlast$state2 <- apply(cr[,4:ncol(cr)],1,function(x) tail(x[!is.na(x) & x!=3],1))
+  #Proportion of individuals first captured as juvenile/adult
+  sum(firstlast$state1==1)/nrow(firstlast); sum(firstlast$state1==2)/nrow(firstlast)
+  #Proportion of juveniles that were subsequently captured as adults
+  sum(firstlast$state1==1 & firstlast$state2==2)/sum(firstlast$state1==1)
+  
 #-----------------------------------------------------------------------------------------------# 
 # Function to create initial values for JAGS
 #-----------------------------------------------------------------------------------------------# 
