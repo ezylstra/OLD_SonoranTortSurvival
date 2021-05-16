@@ -769,8 +769,6 @@ disttocity <- read.csv('PlotDistToCity.csv',header=TRUE,stringsAsFactors=FALSE)
   
   plotests
   
-
-  
 #-----------------------------------------------------------------------------------------------# 
 # Post-processing: population growth rates
 #-----------------------------------------------------------------------------------------------#	 
@@ -781,16 +779,16 @@ disttocity <- read.csv('PlotDistToCity.csv',header=TRUE,stringsAsFactors=FALSE)
   phi.Xdf <- plotcovs[rep(seq_len(nrow(plotcovs)),each=3),] 
   drought3 <- rep(c(-3,0,3),nrow(plotcovs))
   phi.Xdf$drought.z <- (drought3 - pdsi24.mn)/pdsi24.sd
-  phi.Xdf$int.z <- phi2.Xdf$mnprecip.z*phi2.Xdf$drought.z
+  phi.Xdf$int.z <- phi.Xdf$mnprecip.z*phi.Xdf$drought.z
   
   #Create a matrix of covariate values for juvenile survival  
   phi1.X <- as.matrix(phi.Xdf[,c('dist.z','mnprecip.z','drought.z','int.z')])
   phi1.X <- cbind(rep(1,nrow(phi1.X)),phi1.X)  
   
   #Create a matrix of covariate values for adult survival 
-  #Last column is for the trend effect (17 = 2004-2005 estimates)
+  #Last two columns are for the trend effect (using 2019-2020 estimates)
   phi2.X <- as.matrix(phi.Xdf[,c('dist.z','mnprecip.z','drought.z','int.z')])
-  phi2.X <- cbind(rep(1,nrow(phi2.X)),phi2.X,rep(17,nrow(phi2.X)))
+  phi2.X <- cbind(rep(1,nrow(phi2.X)),phi2.X,rep(tail(yr.trendz,1),nrow(phi2.X)),rep(tail(yr.trend2z,1),nrow(phi2.X)))
 
   #Create a matrix of covariate values for transition rate  
   psi12.X <- as.matrix(phi.Xdf[,'mnprecip.z'])
@@ -817,10 +815,10 @@ disttocity <- read.csv('PlotDistToCity.csv',header=TRUE,stringsAsFactors=FALSE)
 #Create population projection matrices, and estimate lambda values
 #Assuming recruitment = 0.32 f/f/yr 
   
-  lambda <- matrix(NA,nrow=nrow(phi2),ncol=niter)
+  lambda <- matrix(NA,nrow=nrow(phi2),ncol=ncol(phi2))
   
   for(i in 1:nrow(phi2)){ 
-    for (j in 1:niter){
+    for (j in 1:ncol(phi2)){
       proj.mat <- matrix(c(phi1[i,j]*(1-psi12[j]), 0.32,
                            phi1[i,j]*psi12[j], phi2[i,j]),
                          nrow=2,ncol=2,byrow=TRUE)
