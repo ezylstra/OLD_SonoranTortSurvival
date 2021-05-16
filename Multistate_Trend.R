@@ -635,24 +635,42 @@ disttocity <- read.csv('PlotDistToCity.csv',header=TRUE,stringsAsFactors=FALSE)
            lty=c(1,1,2,2),col=c(col1,col2,col1,col2),bty='n')    
   #dev.off()  
 
-#Temporal trend in adult survival
+#Temporal trends in adult survival
   #For an average site with PDSI = 0
-  phi2t <- phi2.s[,c('beta.phi2','b2.male','b2.trend')]
+  phi2t <- phi2.s[,c('beta.phi2','b2.male','b2.trend','b2.trend2')]
 
-  predtx <- cbind(int=1,male=rep(0:1,each=33),trend=rep(0:32,2))
+  predtx <- cbind(int=1,male=rep(0:1,each=33),trend=rep(yr.trendz,2),trend2=rep(yr.trend2z,2))
   predtl <- predtx %*% t(phi2t)
   predt <- exp(predtl)/(1+exp(predtl))  
   
-  predt.both <- data.frame(trend=0:32,interval=rep(paste(1987:2019,1988:2020,sep='-')))
+  predt.both <- data.frame(endyr=1988:2020,interval=rep(paste(1987:2019,1988:2020,sep='-')))
   predt.both$female <- round(apply(predt[1:33,],1,ctend),3)
   predt.both$female.lcl <- round(apply(predt[1:33,],1,quantile,probs=qprobs[1]),3)
   predt.both$female.ucl <- round(apply(predt[1:33,],1,quantile,probs=qprobs[2]),3)
   predt.both$male <- round(apply(predt[34:66,],1,ctend),3)
   predt.both$male.lcl <- round(apply(predt[34:66,],1,quantile,probs=qprobs[1]),3)
   predt.both$male.ucl <- round(apply(predt[34:66,],1,quantile,probs=qprobs[2]),3)  
-  #Females: increased from 0.90 to 0.98 over 33 intervals
-  #Males: increased from 0.88 to 0.97 over 33 intervals
   
+  #Figure with survival rates by year and sex
+  #jpeg('AdultSurvival_Trend.jpg',width=80,height=70,units='mm',res=600)
+  par(mar=c(2.5,3.5,0.5,0.6),cex=0.8)  
+  plot(female~endyr,predt.both,type='l',lty=1,col=col1,ylim=c(0.73,1),xaxt='n',yaxt='n',
+       bty='n',xlab='',ylab='',yaxs='i')
+    axis(1,at=c(par('usr')[1],par('usr')[2]),tck=F,labels=F)
+    axis(1,at=seq(1990,2020,by=5),labels=seq(1990,2020,by=5),tcl=-0.25,mgp=c(1.5,0.4,0))
+    axis(2,at=c(par('usr')[3],par('usr')[4]),tck=F,labels=F)
+    axis(2,at=seq(0.75,1,by=0.05),labels=c('0.75','0.80','0.85','0.90','0.95','1.00'),
+         tcl=-0.25,las=1,mgp=c(1.5,0.5,0)) 
+    polygon(c(predt.both$endyr,rev(predt.both$endyr)),c(predt.both$female.lcl,rev(predt.both$female.ucl)),
+            border=NA,col=col1p)
+    lines(male~endyr,predt.both,type='l',lty=1,col=col2)
+    polygon(c(predt.both$endyr,rev(predt.both$endyr)),c(predt.both$male.lcl,rev(predt.both$male.ucl)),
+            border=NA,col=col2p) 
+    mtext('Adult survival (95% CI)',side=2,las=0,line=2.5,cex=0.8)
+    mtext('Year',side=1,line=1.5,cex=0.8)
+    legend('bottomright',c('Female','Male'),lty=1,col=c(col1,col2),bty='n') 
+  #dev.off()  
+    
 #Temporal trend in PDSI values?
   pdsi24t <- unique(pdsi.plot[,c('yr','div','pdsi.24')])
   pdsi24t$yr0 <- pdsi24t$yr - min(pdsi24t$yr) 
