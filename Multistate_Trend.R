@@ -858,6 +858,8 @@ disttocity <- read.csv('PlotDistToCity.csv',header=TRUE,stringsAsFactors=FALSE)
   lambda.df$q0.5 <- apply(lambda,1,quantile,0.5)
   lambda.df$q0.95 <- apply(lambda,1,quantile,0.95)
   lambda.df$q0.975 <- apply(lambda,1,quantile,0.975)
+  lambda.df$probdecline <- apply(lambda,1,function(x) sum(x<1)/length(x))
   (lambda.df <- lambda.df[with(lambda.df,order(drought,plot)),])
+  ddply(lambda.df,.(drought),summarize,mn.prob=mean(probdecline),min.prob=min(probdecline),max.prob=max(probdecline))
   #write.table(lambda.df,'clipboard',sep='\t',row.names=FALSE,col.names=TRUE)
   
