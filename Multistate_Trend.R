@@ -863,3 +863,8 @@ disttocity <- read.csv('PlotDistToCity.csv',header=TRUE,stringsAsFactors=FALSE)
   ddply(lambda.df,.(drought),summarize,mn.prob=mean(probdecline),min.prob=min(probdecline),max.prob=max(probdecline))
   #write.table(lambda.df,'clipboard',sep='\t',row.names=FALSE,col.names=TRUE)
   
+#Correlations between lambda values and latitude/longitude
+  lambda.df <- join(lambda.df,disttocity[,c('plot','lat','long')],by='plot',type='left')
+  cor.test(lambda.df$mn[lambda.df$drought==-3],lambda.df$lat[lambda.df$drought==-3])
+  cor.test(lambda.df$mn[lambda.df$drought==-3],lambda.df$long[lambda.df$drought==-3])
+  
