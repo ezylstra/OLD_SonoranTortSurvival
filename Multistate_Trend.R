@@ -492,7 +492,7 @@ disttocity <- read.csv('PlotDistToCity.csv',header=TRUE,stringsAsFactors=FALSE)
 #Marginal effects of covariates on adult survival: mean precipitation and drought
   #Use survival estimates for last year (2019-2020)
   #Assume average distance from city (standardized distance = 0)
-  phi2 <- phi2.s[,c('beta.phi2','b2.male','b2.mnprecip','b2.drought','b2.int','b2.trend','b2.trend')]
+  phi2 <- phi2.s[,c('beta.phi2','b2.male','b2.mnprecip','b2.drought','b2.int','b2.trend','b2.trend2')]
   xmin <- min(pdsi24.z); xmax <- max(pdsi24.z)
  
   #Generate covariate values for figure
@@ -529,12 +529,12 @@ disttocity <- read.csv('PlotDistToCity.csv',header=TRUE,stringsAsFactors=FALSE)
   #Figure with M/F adult survival at extreme mnprecip values (wet/dry plots)
   #jpeg('AdultSurvival_DroughtPrecipExtremes.jpg',width=80,height=70,units='mm',res=600)
   par(mar=c(2.5,3.5,0.5,0.6),cex=0.8)
-  plot(mean.f.dry~plotx,type='l',lty=1,xaxt='n',yaxt='n',xlab='',ylab='', ylim=c(0.947,1),
+  plot(mean.f.dry~plotx,type='l',lty=1,xaxt='n',yaxt='n',xlab='',ylab='', ylim=c(0.78,1),
        bty='n',yaxs='i',col=col1)
     axis(1,at=c(par('usr')[1],par('usr')[2]),tck=F,labels=F)
     axis(1,at=seq(-4,4,by=2),labels=seq(-4,4,by=2),tcl=-0.25,mgp=c(1.5,0.4,0))
     axis(2,at=c(par('usr')[3],par('usr')[4]),tck=F,labels=F)
-    axis(2,at=seq(0.95,1,by=0.01),labels=c('0.95','0.96','0.97','0.98','0.99','1.00'),
+    axis(2,at=seq(0.8,1,by=0.05),labels=c('0.80','0.85','0.90','0.95','1.00'),
          tcl=-0.25,las=1,mgp=c(1.5,0.5,0))
     #polygon(c(plotx,rev(plotx)),c(ci.f.dry[1,],rev(ci.f.dry[2,])),col=col1p,border=NA)
     lines(mean.f.wet~plotx,type='l',lty=2,col=col1)
@@ -553,12 +553,12 @@ disttocity <- read.csv('PlotDistToCity.csv',header=TRUE,stringsAsFactors=FALSE)
   #Figure with M/F adult survival at plot with mnprecip = mean
   #jpeg('AdultSurvival_DroughtPrecipMean.jpg',width=80,height=70,units='mm',res=600)
   par(mar=c(2.5,3.5,0.5,0.6),cex=0.8)
-  plot(mean.f.avg~plotx,type='l',lty=1,xaxt='n',yaxt='n',xlab='',ylab='', ylim=c(0.947,1),
+  plot(mean.f.avg~plotx,type='l',lty=1,xaxt='n',yaxt='n',xlab='',ylab='', ylim=c(0.78,1),
        bty='n',yaxs='i',col=col1)
     axis(1,at=c(par('usr')[1],par('usr')[2]),tck=F,labels=F)
     axis(1,at=seq(-4,4,by=2),labels=seq(-4,4,by=2),tcl=-0.25,mgp=c(1.5,0.4,0))
     axis(2,at=c(par('usr')[3],par('usr')[4]),tck=F,labels=F)
-    axis(2,at=seq(0.95,1,by=0.01),labels=c('0.95','0.96','0.97','0.98','0.99','1.00'),
+    axis(2,at=seq(0.8,1,by=0.05),labels=c('0.80','0.85','0.90','0.95','1.00'),
          tcl=-0.25,las=1,mgp=c(1.5,0.5,0))
     polygon(c(plotx,rev(plotx)),c(ci.f.avg[1,],rev(ci.f.avg[2,])),col=col1p,border=NA)  
     lines(mean.m.avg~plotx,type='l',lty=1,col=col2)
@@ -637,12 +637,12 @@ disttocity <- read.csv('PlotDistToCity.csv',header=TRUE,stringsAsFactors=FALSE)
     arrows(x0=0,x1=0,y0=0.45,y1=1,length=0,col='gray50',lty=3)
     mtext('Juvenile survival',side=2,las=0,line=2.5,cex=0.8)
     legend('bottomright',c('Arid','Semiarid'),lty=c(1,2),col='black',bty='n') 
-  plot(mean.f.dry~plotx,type='l',lty=1,xaxt='n',yaxt='n',xlab='',ylab='', ylim=c(0.947,1),
+  plot(mean.f.dry~plotx,type='l',lty=1,xaxt='n',yaxt='n',xlab='',ylab='', ylim=c(0.78,1),
        bty='n',yaxs='i',col=col1)
     axis(1,at=c(par('usr')[1],par('usr')[2]),tck=F,labels=F)
     axis(1,at=seq(-4,4,by=2),labels=seq(-4,4,by=2),tcl=-0.25,mgp=c(1.5,0.4,0))
     axis(2,at=c(par('usr')[3],par('usr')[4]),tck=F,labels=F)
-    axis(2,at=seq(0.95,1,by=0.01),labels=c('0.95','0.96','0.97','0.98','0.99','1.00'),
+    axis(2,at=seq(0.8,1,by=0.05),labels=c('0.80','0.85','0.90','0.95','1.00'),
          tcl=-0.25,las=1,mgp=c(1.5,0.5,0))
     #polygon(c(plotx,rev(plotx)),c(ci.f.dry[1,],rev(ci.f.dry[2,])),col=col1p,border=NA)
     lines(mean.f.wet~plotx,type='l',lty=2,col=col1)
@@ -863,6 +863,39 @@ disttocity <- read.csv('PlotDistToCity.csv',header=TRUE,stringsAsFactors=FALSE)
   ddply(lambda.df,.(drought),summarize,mn.prob=mean(probdecline),min.prob=min(probdecline),max.prob=max(probdecline))
   #write.table(lambda.df,'clipboard',sep='\t',row.names=FALSE,col.names=TRUE)
   
+#Calculate overall lambda values (city, mnprecip = 0):
+  #Juvenile survival
+  phi1O.X <- phi1.X[1:3,c(1,4)]
+  phi1O.s <- phi1.s[,c('beta.phi1','b1.drought')]
+  lphi1O <- as.matrix(phi1O.X) %*% t(phi1O.s)
+  phi1O <- exp(lphi1O)/(1+exp(lphi1O))
+  #Adult female survival
+  phi2O.X <- phi2.X[1:3,c(1,4,6,7)]
+  phi2O.s <- phi2.s.female[,c('beta.phi2','b2.drought','b2.trend','b2.trend2')]
+  lphi2O <- as.matrix(phi2O.X) %*% t(phi2O.s)
+  phi2O <- exp(lphi2O)/(1+exp(lphi2O))
+  #Transition
+  psiO <- comb[,'psi12.mn']
+  
+  lambdaO <- matrix(NA,nrow=nrow(phi2O),ncol=ncol(phi2O))
+  for(i in 1:nrow(phi2O)){ 
+    for (j in 1:ncol(phi2O)){
+      proj.mat <- matrix(c(phi1O[i,j]*(1-psiO[j]), 0.32,
+                           phi1O[i,j]*psiO[j], phi2O[i,j]),
+                         nrow=2,ncol=2,byrow=TRUE)
+      lambdaO[i,j] <- eigen(proj.mat)$values[1]
+    }
+  }   
+  lambdaO.df <- data.frame(drought=drought3[1:3])
+  lambdaO.df$mn <- apply(lambdaO,1,mean)
+  lambdaO.df$q0.025 <- apply(lambdaO,1,quantile,0.025)
+  lambdaO.df$q0.05 <- apply(lambdaO,1,quantile,0.05)
+  lambdaO.df$q0.5 <- apply(lambdaO,1,quantile,0.5)
+  lambdaO.df$q0.95 <- apply(lambdaO,1,quantile,0.95)
+  lambdaO.df$q0.975 <- apply(lambdaO,1,quantile,0.975)
+  lambdaO.df$probdecline <- apply(lambdaO,1,function(x) sum(x<1)/length(x))
+  lambdaO.df
+
 #Correlations between lambda values and latitude/longitude
   lambda.df <- join(lambda.df,disttocity[,c('plot','lat','long')],by='plot',type='left')
   cor.test(lambda.df$mn[lambda.df$drought==-3],lambda.df$lat[lambda.df$drought==-3])
