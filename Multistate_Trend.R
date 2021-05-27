@@ -338,7 +338,7 @@ disttocity <- read.csv('PlotDistToCity.csv',header=TRUE,stringsAsFactors=FALSE)
   # 
   #     c.mnprecip ~ dnorm(0,0.1)
   # 
-  #     psi.male ~ dunif(0,1)
+  #     omega ~ dunif(0,1)
   # 
   #     sigma.site.2 ~ dt(0,pow(2.5,-2),1)T(0,)
   #     tau.site.2 <- 1/(sigma.site.2*sigma.site.2)
@@ -393,7 +393,7 @@ disttocity <- read.csv('PlotDistToCity.csv',header=TRUE,stringsAsFactors=FALSE)
   # 
   #     for(i in 1:ntorts){
   #       z[i,first[i]] <- y[i,first[i]]
-  #       male[i] ~ dbern(psi.male)
+  #       male[i] ~ dbern(omega)
   # 
   #       for (t in (first[i]+1):nyears){
   # 
@@ -429,7 +429,7 @@ disttocity <- read.csv('PlotDistToCity.csv',header=TRUE,stringsAsFactors=FALSE)
 	            'gamma.psi','c.mnprecip',
 	            'alpha.p2','a2.male','a2.precip','a2.effort',
 	            'beta.phi2','b2.male','b2.distance','b2.mnprecip','b2.drought','b2.int','b2.trend','b2.trend2',
-	            'psi.male','sigma.site.2','e.site.2',
+	            'omega','sigma.site.2','e.site.2',
 	            'p1.mn','phi1.mn','psi12.mn',
 	            'phi2.f','phi2.m','p2.f','p2.m')
 
@@ -455,7 +455,7 @@ disttocity <- read.csv('PlotDistToCity.csv',header=TRUE,stringsAsFactors=FALSE)
                             b2.trend=runif(1,-0.5,0.5),
                             b2.trend2=runif(1,-0.5,0.5),
                             c.mnprecip=runif(1,-0.5,0.5),
-                            psi.male=runif(1,0,1),
+                            omega=runif(1,0,1),
                             sigma.site.2=runif(1,0,3),
                             male=ifelse(is.na(male.ind),1,NA),
                             z=ch.init(as.matrix(cr.mat),first1,first2))}
