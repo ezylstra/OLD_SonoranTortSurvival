@@ -22,7 +22,7 @@ disttocity <- read.csv('PlotDistToCity.csv',header=TRUE,stringsAsFactors=FALSE)
 #-----------------------------------------------------------------------------------------------# 
 # Formatting survey schedule
 #-----------------------------------------------------------------------------------------------# 
-#This is an excel file sent to me in late 2020, with a summary of plot survey effort from 1987-future
+#This is an excel file sent to us in late 2020, with a summary of plot survey effort from 1987-2020
 #In each column labeled yYYYY, values are the number of person-days spent surveying
 
   surv.l <- melt(survs,id.vars=c('plot','code','area.sqmi'),value.name='persondays')
@@ -703,12 +703,53 @@ disttocity <- read.csv('PlotDistToCity.csv',header=TRUE,stringsAsFactors=FALSE)
   points(pdsi.24~yr0,data=pdsi24t[pdsi24t$div==6,],type='b',pch=19,col='salmon3')
   points(pdsi.24~yr0,data=pdsi24t[pdsi24t$div==7,],type='b',pch=19,col='gray50')
   
+  #Quick run of ML linear regression models
   summary(lm.trend1 <- lm(pdsi.24~yr0,data=pdsi24t))  
   summary(lm.trend5 <- lm(pdsi.24~yr0*factor(div),data=pdsi24t))
   AIC(lm.trend1); AIC(lm.trend5) #AIC 10 points lower for the simpler model
-  pdsipreds <- data.frame(yr0=seq(0,32,length=100))
-  pdsipreds <- cbind(pdsipreds,predict(lm.trend1,newdata=pdsipreds,interval='confidence'))
   
+  #Bayesian linear regression
+  # sink("LinearRegression.txt")
+  # cat("
+  #   model{
+  # 
+  #     for(i in 1:nobs){
+  #       y[i] ~ dnorm(mu[i], tau)
+  #       mu[i] <- b0 + b1*x[i]
+  #     }
+  # 
+  #     b0 ~ dnorm(0,0.0000001)
+  #     b1 ~ dnorm(0,0.0000001)
+  #     sigma ~ dunif(0,1000)
+  #     tau <- 1/(sigma*sigma)
+  # 
+  #   } #model
+  # ",fill=TRUE)
+  # sink()
+  
+  ni <- 2000; na <- 1000; nb <- 8000; nc <- 3; ni.tot <- ni + nb
+  params <- c('b0','b1','sigma')
+  inits <- function() {list(b0=runif(1,-30,0),
+                            b1=runif(1,-2,2),
+                            sigma=runif(1,1,100))}  
+  pdsi.dat <- list(x=pdsi24t$yr0,
+                   y=pdsi24t$pdsi.24,
+                   nobs=nrow(pdsi24t))
+  set.seed(123)
+  fit.pdsi <- jags(data=pdsi.dat, inits=inits, parameters.to.save=params,
+                   model.file='LinearRegression.txt',
+                   n.chains=nc, n.adapt=na, n.iter=ni.tot, n.burnin=nb,
+                   parallel=T, n.cores=3, DIC=F)
+  print(fit.pdsi)
+
+  X <- data.frame(int=1,yr0=seq(0,32,length=100))
+  fit.s <- fit.pdsi$samples
+  fit.mat <- combine.mcmc(fit.s)
+  betas <- fit.mat[,1:2]
+  pdsipreds <- as.matrix(X) %*% t(betas)
+  cent.pdsi <- apply(pdsipreds,1,ctend)
+  cri.pdsi <- apply(pdsipreds,1,quantile,probs=qprobs)
+
   col5 <- col2rgb(c('mediumpurple4','steelblue4','darkseagreen4','goldenrod4','salmon4'))
   trans <- 0.5
   col5.1p <- rgb(col5[1,1],col5[2,1],col5[3,1],alpha=trans*255,max=255)
@@ -719,9 +760,9 @@ disttocity <- read.csv('PlotDistToCity.csv',header=TRUE,stringsAsFactors=FALSE)
   
   #Figure with juvenile survival at plot with mnprecip = mean
   #jpeg('PDSI_trend.jpg',width=6.5,height=3,units='in',res=600)
-  par(mar=c(2.5,3.0,0.5,0.6),cex=0.7)
-  plot(pdsi.24~yr0,data=pdsi24t[pdsi24t$div==1,],type='b',pch=19,xaxt='n',yaxt='n',xlab='',
-       ylab='', ylim=c(-4.5,4.8),bty='n',yaxs='i',col=col5.1p)
+    par(mar=c(2.5,3.0,0.5,0.6),cex=0.7)
+    plot(pdsi.24~yr0,data=pdsi24t[pdsi24t$div==1,],type='b',pch=19,xaxt='n',yaxt='n',xlab='',
+         ylab='', ylim=c(-4.5,4.8),bty='n',yaxs='i',col=col5.1p)
     axis(1,at=c(par('usr')[1],par('usr')[2]),tck=F,labels=F)
     axis(1,at=seq(0,32,by=8),labels=seq(1988,2020,by=8),tcl=-0.25,mgp=c(1.5,0.4,0))
     axis(2,at=c(par('usr')[3],par('usr')[4]),tck=F,labels=F)
@@ -731,13 +772,13 @@ disttocity <- read.csv('PlotDistToCity.csv',header=TRUE,stringsAsFactors=FALSE)
     points(pdsi.24~yr0,data=pdsi24t[pdsi24t$div==5,],type='b',pch=19,col=col5.3p)
     points(pdsi.24~yr0,data=pdsi24t[pdsi24t$div==6,],type='b',pch=19,col=col5.4p)
     points(pdsi.24~yr0,data=pdsi24t[pdsi24t$div==7,],type='b',pch=19,col=col5.5p)    
-    lines(fit~yr0,pdsipreds)
-    polygon(c(pdsipreds$yr0,rev(pdsipreds$yr0)),c(pdsipreds$lwr,rev(pdsipreds$upr)),col=rgb(0,0,0,0.2),border=NA)
+    lines(cent.pdsi~X$yr0)
+    polygon(c(X$yr0,rev(X$yr0)),c(cri.pdsi[1,],rev(cri.pdsi[2,])),col=rgb(0,0,0,0.2),border=NA)
     mtext('PDSI (24-month)',side=2,las=0,line=2.1,cex=0.7)
     mtext('Year',side=1,line=1.5,cex=0.7)
     legend(x=27,y=4.8,c('1','3','5','6','7'),title='Division',pch=19,y.intersp=0.9,adj=c(0,0.5),
            col=c(col5.1p,col5.2p,col5.3p,col5.4p,col5.5p),bty='n')
-  #dev.off()    
+  #dev.off() 
 
 #-----------------------------------------------------------------------------------------------# 
 # Post-processing: plot-specific estimates
